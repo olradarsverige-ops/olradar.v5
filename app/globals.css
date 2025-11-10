@@ -2,29 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { --glass: rgba(255,255,255,0.10); }
+/* --- Theme surface --- */
+:root { --glass: rgba(255,255,255,0.10); --brand: #6ee7ff; }
 
 html, body { height: 100%; }
-
 .gradient-bg {
-  background: radial-gradient(60% 60% at 50% 0%, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 60%), 
+  background: radial-gradient(60% 60% at 50% 0%, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 60%),
               linear-gradient(135deg, #07121b 0%, #0b1b26 40%, #0d1117 100%);
 }
-
 body { color: rgba(255,255,255,0.92); }
 
-.input, .card-glass input, .card-glass textarea, .card-select, .card-glass select {
+/* --- Inputs --- */
+.input, .card-select {
   @apply rounded-xl border outline-none w-full;
   background: rgba(255,255,255,0.06);
-  border-color: rgba(255,255,255,0.28);
+  border-color: rgba(255,255,255,0.22);
   color: rgba(255,255,255,0.96);
-  padding: 0.65rem 0.9rem;
+  padding: 0.7rem 0.9rem;
 }
+.input::placeholder { color: rgba(255,255,255,0.75); }
+.label { @apply text-sm opacity-90 mb-1 block; }
 
-.input::placeholder, .card-glass input::placeholder, .card-glass textarea::placeholder {
-  color: rgba(255,255,255,0.78);
+/* --- Buttons --- */
+.btn {
+  @apply inline-flex items-center gap-2 rounded-xl px-3 py-2 transition border;
+  border-color: rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.10);
 }
+.btn:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(0,0,0,0.3); }
 
+.btn-primary {
+  @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 font-medium;
+  color: #0b1220;
+  background: linear-gradient(180deg, var(--brand), #34d3ff);
+  border: none;
+  box-shadow: 0 10px 24px rgba(52,211,255,0.35);
+}
+.btn-primary:hover { filter: brightness(1.05); transform: translateY(-1px); }
+
+/* Secondary text buttons */
+.btn-ghost { @apply rounded-xl px-3 py-2; background: transparent; border-color: rgba(255,255,255,0.2); }
+
+/* Cards */
 .card-glass {
   @apply rounded-2xl backdrop-blur-md border;
   border-color: rgba(255,255,255,0.16);
@@ -32,9 +51,33 @@ body { color: rgba(255,255,255,0.92); }
   box-shadow: 0 12px 30px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
-.btn { @apply inline-flex items-center gap-2 rounded-xl px-3 py-2 transition border;
-  border-color: rgba(255,255,255,0.18);
-  background: rgba(255,255,255,0.10);
+/* --- Modal --- */
+.modal-surface {
+  @apply rounded-2xl;
+  background: linear-gradient(180deg, rgba(19,22,28,0.96), rgba(12,15,20,0.96));
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
 }
-.btn:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(0,0,0,0.3); }
-.label { @apply text-sm opacity-90 mb-1 block; }
+.modal-header {
+  @apply flex items-center justify-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.modal-title { @apply text-lg font-semibold; }
+.modal-body { padding: 1rem 1.25rem; }
+.modal-footer {
+  @apply flex items-center justify-end gap-2;
+  padding: 0.75rem 1.25rem 1.25rem 1.25rem;
+}
+
+/* --- Floating action button (mobile) --- */
+.fab {
+  position: fixed; right: 1rem; bottom: 1rem;
+  z-index: 30;
+}
+@media (min-width: 768px) {
+  .fab { display: none; }
+}
+
+/* Ensure overlays never block clicks */
+.overlay-safe { pointer-events: none; }

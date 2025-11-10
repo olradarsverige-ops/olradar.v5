@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 import { FadeIn, HypeCard, Chip, TrophyPill, BellButton, ShareButton } from '../../components/ui'
 import Image from 'next/image'
-import { MapPin, Camera, Star, Plus } from 'lucide-react'
+import { MapPin, Camera, Star, Plus, Beer } from 'lucide-react'
 import { xpForLogs, badgeForCount, streakFromDates, isHappyHourNow } from '../../lib/game'
 import { fireConfetti } from '../../components/confetti'
 import { CITY_COORDS, CityKey } from '../../lib/cities'
@@ -145,17 +145,13 @@ export default function LangPage(){
     if (!el) return
     if (typeof (el as any).showModal === 'function') {
       try { (el as any).showModal() } catch { el.setAttribute('open','') }
-    } else {
-      el.setAttribute('open','')
-    }
+    } else { el.setAttribute('open','') }
   }
   function closeModal(){
     const el = modalRef.current; if (!el) return
     if (typeof (el as any).close === 'function') {
       try { (el as any).close() } catch { el.removeAttribute('open') }
-    } else {
-      el.removeAttribute('open')
-    }
+    } else { el.removeAttribute('open') }
   }
 
   return (
@@ -171,8 +167,9 @@ export default function LangPage(){
               try { Notification.requestPermission().then(()=> alert(t('Jag pingar när ett fynd dyker upp.','I\'ll ping you when a new deal appears.'))) } catch {}
             }}/>
             <ShareButton title="Ölradar" text={t('Kolla denna ölradar!','Check out this beer radar!')}/>
-            <button type="button" className="btn" onClick={openModal}>
-              <Plus size={16}/> {t('Logga öl','Log beer')}
+            {/* Primary CTA */}
+            <button type="button" className="btn-primary" onClick={openModal}>
+              <Plus size={18}/> {t('Logga öl','Log beer')}
             </button>
           </div>
         </div>
@@ -182,23 +179,12 @@ export default function LangPage(){
         <div className="grid md:grid-cols-[1fr_auto_auto] gap-3 items-end">
           <div>
             <label className="label">{t('Sök','Search')}</label>
-            <input
-              placeholder={t('Sök stad eller ställe…','Search city or venue…')}
-              className="input"
-              value={q} onChange={e=> setQ(e.target.value)}
-            />
+            <input placeholder={t('Sök stad eller ställe…','Search city or venue…')} className="input" value={q} onChange={e=> setQ(e.target.value)} />
           </div>
           <div>
             <label className="label">{t('Stad','City')}</label>
-            <input
-              list="city-list"
-              className="input"
-              value={city}
-              onChange={(e)=> setCity(e.target.value as CityKey)}
-            />
-            <datalist id="city-list">
-              {cities.map(c => <option key={c} value={c} />)}
-            </datalist>
+            <input list="city-list" className="input" value={city} onChange={(e)=> setCity(e.target.value as CityKey)} />
+            <datalist id="city-list">{cities.map(c => <option key={c} value={c} />)}</datalist>
           </div>
           <div>
             <label className="label">{t('Sortering','Sort')}</label>
@@ -220,17 +206,11 @@ export default function LangPage(){
                              'from-indigo-500'
             return (
               <div key={venue.id} className="relative overflow-hidden rounded-2xl border border-white/14 bg-white/5">
-                {/* Prevent overlay from intercepting clicks */}
-                <div className={`absolute inset-0 opacity-20 pointer-events-none bg-gradient-to-br ${styleHue} to-transparent`}></div>
+                {/* prevent overlay from stealing clicks */}
+                <div className={`absolute inset-0 opacity-20 overlay-safe bg-gradient-to-br ${styleHue} to-transparent`}></div>
                 <div className="p-4 flex gap-3">
                   <div className="w-28 h-28 relative rounded-xl overflow-hidden border border-white/10 shrink-0">
-                    <Image
-                      src={deal?.photo_url || '/beer-fallback.png'}
-                      alt={venue.name}
-                      fill
-                      sizes="112px"
-                      className="object-cover"
-                    />
+                    <Image src={deal?.photo_url || '/beer-fallback.png'} alt={venue.name} fill sizes="112px" className="object-cover"/>
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -243,14 +223,8 @@ export default function LangPage(){
                       <MapPin size={14}/> {venue.address}, {venue.city}
                     </p>
                     <div className="mt-3 flex items-center gap-3">
-                      <div className="text-lg font-bold">
-                        {deal?.price_sek != null ? `${deal.price_sek.toFixed(0)} SEK` : '—'}
-                      </div>
-                      {deal?.rating != null && (
-                        <span className="inline-flex items-center gap-1 text-sm">
-                          <Star size={14} /> {deal.rating.toFixed(1)}
-                        </span>
-                      )}
+                      <div className="text-lg font-bold">{deal?.price_sek != null ? `${deal.price_sek.toFixed(0)} SEK` : '—'}</div>
+                      {deal?.rating != null && (<span className="inline-flex items-center gap-1 text-sm"><Star size={14} /> {deal.rating.toFixed(1)}</span>)}
                     </div>
                   </div>
                 </div>
@@ -265,97 +239,61 @@ export default function LangPage(){
         </section>
       </FadeIn>
 
-      <FadeIn delay={0.15}>
-        <section className="grid md:grid-cols-3 gap-4">
-          <HypeCard>
-            <h4 className="font-semibold">{t('Din nivå','Your level')}</h4>
-            {(() => {
-              const me = Object.keys(countByUser)[0]
-              const count = me ? countByUser[me] : 0
-              const xp = count * 10
-              const badge = badgeForCount(count)
-              const streak = streakFromDates(logsByUser[me] || [])
-              return (
-                <div className="mt-2 space-y-1">
-                  <TrophyPill points={xp} />
-                  <div className="text-sm text-white/85">{t('Loggar','Logs')}: {count}</div>
-                  <div className="text-sm text-white/85">{t('Streak','Streak')}: {streak} {t('dagar','days')}</div>
-                  {badge && <div className="text-sm mt-1">🎖️ {badge}</div>}
-                </div>
-              )
-            })()}
-          </HypeCard>
-          <HypeCard>
-            <h4 className="font-semibold">{t('Top Hunters denna vecka','Top Hunters this week')}</h4>
-            <ol className="mt-2 space-y-1 list-decimal pl-5">
-              {weekly.map((r,i)=>(
-                <li key={r.user} className="text-sm flex justify-between">
-                  <span className="text-white/85">#{i+1} {r.user.slice(0,6)}</span>
-                  <span className="font-medium">{r.count} {t('loggar','logs')}</span>
-                </li>
-              ))}
-            </ol>
-          </HypeCard>
-          <HypeCard>
-            <h4 className="font-semibold">{t('Tips','Tips')}</h4>
-            <p className="text-sm text-white/85 mt-2">
-              {t('Få en streak med en snabb lunchlogg.','Keep your streak with a quick lunch log.')}
-            </p>
-          </HypeCard>
-        </section>
-      </FadeIn>
+      {/* Floating action button for mobile */}
+      <button type="button" className="btn-primary fab" onClick={openModal}>
+        <Beer size={18}/> {t('Logga','Log')}
+      </button>
 
       <dialog id="log-modal" ref={modalRef} className="backdrop:bg-black/50 rounded-2xl p-0">
-        <form action="/api/log" method="post" encType="multipart/form-data" className="p-5 space-y-3 bg-neutral-900 rounded-2xl w-[min(560px,92vw)]">
-          <h4 className="text-lg font-semibold">{t('Logga en öl','Log a beer')}</h4>
-
-          <div>
-            <label className="label">{t('Ställe','Venue')}</label>
-            <input name="venue_name" list="venue-list" placeholder={t('Skriv eller välj…','Type or choose…')} required className="input"/>
-            <datalist id="venue-list">
-              {venueOptions.map(v => <option key={v} value={v} />)}
-            </datalist>
+        <div className="modal-surface w-[min(640px,95vw)]">
+          <div className="modal-header">
+            <div className="modal-title flex items-center gap-2"><Beer size={18}/> {t('Logga en öl','Log a beer')}</div>
+            <button className="btn-ghost" onClick={closeModal}>✕</button>
           </div>
-
-          <div className="grid grid-cols-2 gap-3">
+          <div className="modal-body space-y-4">
             <div>
-              <label className="label">{t('Öl (namn)','Beer (name)')}</label>
-              <input name="beer_name" placeholder={t('Ex: Pilsner Urquell','e.g., Pilsner Urquell')} required className="input"/>
+              <label className="label">{t('Ställe','Venue')}</label>
+              <input name="venue_name" list="venue-list" placeholder={t('Skriv eller välj…','Type or choose…')} required className="input"/>
+              <datalist id="venue-list">{venueOptions.map(v => <option key={v} value={v} />)}</datalist>
             </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="label">{t('Öl (namn)','Beer (name)')}</label>
+                <input name="beer_name" placeholder={t('Ex: Pilsner Urquell','e.g., Pilsner Urquell')} required className="input"/>
+              </div>
+              <div>
+                <label className="label">{t('Stil','Style')}</label>
+                <input name="beer_style" list="beer-style-list" placeholder={t('Välj eller skriv…','Choose or type…')} className="input"/>
+                <datalist id="beer-style-list">{beerStyles.map(s=> <option key={s} value={s} />)}</datalist>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="label">SEK</label>
+                <input name="price_sek" type="number" step="1" placeholder="SEK" required className="input"/>
+              </div>
+              <div>
+                <label className="label">{t('Betyg','Rating')}</label>
+                <input name="rating" type="number" step="0.1" min="0" max="5" placeholder="0–5" className="input"/>
+              </div>
+              <div>
+                <label className="label">{t('Stad','City')}</label>
+                <input name="city" value={city} onChange={()=>{}} className="input"/>
+              </div>
+            </div>
+
             <div>
-              <label className="label">{t('Stil','Style')}</label>
-              <input name="beer_style" list="beer-style-list" placeholder={t('Välj eller skriv…','Choose or type…')} className="input"/>
-              <datalist id="beer-style-list">
-                {beerStyles.map(s=> <option key={s} value={s} />)}
-              </datalist>
+              <label className="label">{t('Foto (frivilligt)','Photo (optional)')}</label>
+              <input name="photo" type="file" accept="image/*" className="w-full"/>
             </div>
           </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <label className="label">SEK</label>
-              <input name="price_sek" type="number" step="1" placeholder="SEK" required className="input"/>
-            </div>
-            <div>
-              <label className="label">{t('Betyg','Rating')}</label>
-              <input name="rating" type="number" step="0.1" min="0" max="5" placeholder="0–5" className="input"/>
-            </div>
-            <div>
-              <label className="label">{t('Stad','City')}</label>
-              <input name="city" value={city} onChange={()=>{}} className="input"/>
-            </div>
-          </div>
-
-          <div>
-            <label className="label">{t('Foto (frivilligt)','Photo (optional)')}</label>
-            <input name="photo" type="file" accept="image/*" className="w-full"/>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="modal-footer">
             <button type="button" className="btn" onClick={closeModal}>{t('Avbryt','Cancel')}</button>
-            <button className="btn" onClick={()=> setTimeout(()=> fireConfetti(), 200)}>{t('Spara','Save')}</button>
+            <button className="btn-primary" onClick={()=> setTimeout(()=> fireConfetti(), 200)}>{t('Spara','Save')}</button>
           </div>
-        </form>
+        </div>
       </dialog>
     </main>
   )
