@@ -115,13 +115,19 @@ export default function LangPage(){
                     <p className="text-white/70 text-sm flex items-center gap-1 mt-1">{venue.address}, {venue.city}</p>
                     <div className="mt-3 flex items-center gap-3">
                       <div className="text-lg font-bold">{deal?.price_sek != null ? `${deal.price_sek.toFixed(0)} SEK` : '—'}</div>
-                      {deal?.rating != null && (<span className="inline-flex items-center gap-1 text-sm"><span>★</span> {deal.rating.toFixed(1)}</span>)}
+                      {deal?.rating != null && (<span className="inline-flex items-center gap-1 text-sm"><Star size={14}/> {deal.rating.toFixed(1)}</span>)}
                     </div>
                   </div>
                 </div>
                 <div className="px-4 pb-4 flex gap-2">
-                  <button className="card-glass px-3 py-2 text-sm inline-flex items-center gap-2" onClick={()=> document.getElementById('log-modal')?.showModal()}>
-                    <span>📷</span> {t('Logga öl','Log beer')}
+                  <button
+                    className="card-glass px-3 py-2 text-sm inline-flex items-center gap-2"
+                    onClick={()=>{
+                      const el = document.getElementById('log-modal') as HTMLDialogElement | null
+                      el?.showModal()
+                    }}
+                  >
+                    <Camera size={16}/> {t('Logga öl','Log beer')}
                   </button>
                 </div>
               </div>
