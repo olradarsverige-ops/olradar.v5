@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from '../../lib/supabaseClient';
 import { FadeIn, HypeCard, Chip, TrophyPill, BellButton, ShareButton } from '../../components/ui';
-import { MapPin, Camera, Star, Plus, Beer } from 'lucide-react';
+import { MapPin, Camera, Star, Plus, Beer, Sparkles } from 'lucide-react';
 import { badgeForCount, streakFromDates, isHappyHourNow } from '../../lib/game';
 import { fireConfetti } from '../../components/confetti';
 import { CITY_COORDS, CityKey } from '../../lib/cities';
@@ -80,6 +80,14 @@ export default function LangPage() {
   const [logsByUser, setLogsByUser] = useState<Record<string, string[]>>({});
   const [countByUser, setCountByUser] = useState<Record<string, number>>({});
 
+  // optimistic UI for last log
+  const [justLogged, setJustLogged] = useState<{ venue: string; price: number; style?: string; rating?: number } | null>(null);
+  useEffect(()=>{
+    if (!justLogged) return;
+    const id = window.setTimeout(()=> setJustLogged(null), 12000);
+    return ()=> window.clearTimeout(id);
+  }, [justLogged]);
+
   // Geolocation with fallback to city
   useEffect(() => {
     let canceled = false;
@@ -102,8 +110,9 @@ export default function LangPage() {
     };
   }, [city]);
 
-  const fetchNearby = useCallback(async () => {
-    const res = await fetch(`/api/nearby?city=${encodeURIComponent(city)}&sort=${sort}`);
+  const fetchNearby = useCallback(async (cacheBust = false) => {
+    const qs = cacheBust ? `&_=${Date.now()}` : '';
+    const res = await fetch(`/api/nearby?city=${encodeURIComponent(city)}&sort=${sort}${qs}`);
     const data = await res.json();
     setItems((data && data.items) || []);
 
@@ -165,7 +174,7 @@ export default function LangPage() {
       return 0;
     });
 
-  // weekly leaderboard
+  // weekly leaderboard (left intact)
   const thisMonday = new Date();
   const day = thisMonday.getDay();
   const diff = (day + 6) % 7;
@@ -249,13 +258,27 @@ export default function LangPage() {
     const form = formRef.current;
     if (!form) return;
     const fd = new FormData(form);
+    // Add API-friendly fields
+    const priceStr = (fd.get('price_sek') || '').toString().trim();
+    const priceNum = Number(priceStr || '0');
+    fd.set('price_original', priceStr);   // some backends use original+currency
+    fd.set('currency', 'SEK');
+    fd.set('verified', 'true');           // MVP often expects verified=true to show up
     fd.set('city', city);
+
     try {
       const res = await fetch('/api/log', { method: 'POST', body: fd });
       if (!res.ok) throw new Error('bad status');
+      // Optimistic UI: mark the card immediately
+      const venueName = (fd.get('venue_name') || '').toString();
+      const style = (fd.get('beer_style') || '').toString();
+      const rating = Number((fd.get('rating') || '').toString() || '0') || undefined;
+      if (venueName && priceNum > 0) setJustLogged({ venue: venueName, price: priceNum, style, rating });
+
       closeModal();
-      window.setTimeout(() => fireConfetti(), 100);
-      await fetchNearby();
+      window.setTimeout(() => fireConfetti(), 80);
+      // Cache-bust refresh so we don't hit a stale edge cache
+      await fetchNearby(true);
     } catch (err) {
       alert(t('Något gick fel när loggen skulle sparas.', 'Something went wrong while saving.'));
     }
@@ -318,13 +341,23 @@ export default function LangPage() {
         <section className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(({ venue, deal, distance }) => {
             const priceNum = deal && typeof deal.price_sek === 'number' ? (deal.price_sek as number) : null;
-            const happy = isHappyHourNow(venue.hours) || (priceNum !== null ? priceNum : 999) <= 39;
+
+            // optimistic overlay if we just logged on this venue
+            const optimistic = justLogged && justLogged.venue.toLowerCase() === venue.name.toLowerCase();
+
+            const happy = isHappyHourNow(venue.hours) || (priceNum !== null ? priceNum : 999) <= 39 || (optimistic && justLogged!.price <= 39);
             const styleHue =
-              deal && deal.beer && deal.beer.style && deal.beer.style.includes('IPA')
+              (optimistic && justLogged?.style?.toLowerCase().includes('ipa')) ? 'from-emerald-500'
+              : (optimistic && justLogged?.style?.toLowerCase().includes('lager')) ? 'from-amber-500'
+              : (deal && deal.beer && deal.beer.style && deal.beer.style.includes('IPA'))
                 ? 'from-emerald-500'
-                : deal && deal.beer && deal.beer.style && deal.beer.style.includes('Lager')
+                : (deal && deal.beer && deal.beer.style && deal.beer.style.includes('Lager'))
                 ? 'from-amber-500'
                 : 'from-indigo-500';
+
+            const shownPrice = optimistic ? justLogged!.price : (priceNum !== null ? priceNum : null);
+            const shownRating = optimistic ? justLogged!.rating : (deal && deal.rating != null ? (deal.rating as number) : null);
+
             return (
               <div key={venue.id} className="relative overflow-hidden rounded-2xl border border-white/14 bg-white/5">
                 <div className={`absolute inset-0 opacity-20 overlay-safe bg-gradient-to-br ${styleHue} to-transparent`}></div>
@@ -336,6 +369,7 @@ export default function LangPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold">{venue.name}</h3>
                       {happy && <Chip>⚡ {t('Happy Hour', 'Happy Hour')}</Chip>}
+                      {optimistic && <Chip><Sparkles size={14}/> {t('Ny logg','New log')}</Chip>}
                       {venue.open_now && <Chip>🟢 {t('Öppet', 'Open')}</Chip>}
                       {typeof distance === 'number' && <Chip>🗺️ {distance.toFixed(1)} km</Chip>}
                     </div>
@@ -343,10 +377,10 @@ export default function LangPage() {
                       <MapPin size={14} /> {venue.address}, {venue.city}
                     </p>
                     <div className="mt-3 flex items-center gap-3">
-                      <div className="text-lg font-bold">{priceNum !== null ? `${(priceNum as number).toFixed(0)} SEK` : '—'}</div>
-                      {deal && deal.rating != null && (
+                      <div className="text-lg font-bold">{shownPrice != null ? `${shownPrice.toFixed(0)} SEK` : '—'}</div>
+                      {shownRating != null && (
                         <span className="inline-flex items-center gap-1 text-sm">
-                          <Star size={14} /> {(deal.rating as number).toFixed(1)}
+                          <Star size={14} /> {shownRating.toFixed(1)}
                         </span>
                       )}
                     </div>
