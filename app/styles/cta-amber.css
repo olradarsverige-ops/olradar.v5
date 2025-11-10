@@ -1,16 +1,31 @@
-/* --- HOTFIX: ensure the amber CTA is visibly rendered in the header --- */
+/* --- HOTFIX v2: keep FAB in header on desktop; float only on small screens --- */
 
-/* Give the button intrinsic layout even if no utility classes apply */
-.btn-primary.fab{
+/* Base CTA visuals (kept) */
+.btn-primary.fab,
+.btn-primary.fab-top{
   display:inline-flex !important;
   align-items:center;
   gap:.5rem;
   padding:.65rem 1rem;
   border-radius:.875rem;
-  z-index:20; /* sit above neighbor chips */
+  z-index:30;
 }
 
-/* Optional: nudge to the far right on very small screens when in a flex row */
-@media (max-width: 640px){
-  .fab{ margin-left:auto; }
+/* Desktop & tablets: keep in header flow */
+@media (min-width: 768px){
+  .fab{
+    position:static !important;
+    inset:auto !important;
+    margin-left: .25rem;
+  }
+}
+
+/* Phones: float bottom-right */
+@media (max-width: 767.98px){
+  .fab{
+    position:fixed !important;
+    right:16px !important;
+    bottom:16px !important;
+    box-shadow: var(--cta-amber-glow, 0 10px 36px rgba(245,158,11,.45));
+  }
 }
