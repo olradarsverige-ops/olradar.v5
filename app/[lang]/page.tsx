@@ -3,6 +3,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
+
+// relative imports only (no "@/")
 import { supabase } from '../../lib/supabaseClient';
 import { FadeIn, Chip, BellButton, ShareButton } from '../../components/ui';
 import { MapPin, Camera, Star, Plus, Beer, ChevronDown } from 'lucide-react';
@@ -10,6 +12,7 @@ import { isHappyHourNow } from '../../lib/game';
 import { fireConfetti } from '../../components/confetti';
 import { CITY_COORDS, CityKey } from '../../lib/cities';
 
+/** Types */
 type Venue = {
   id: string;
   name: string;
@@ -38,9 +41,11 @@ type Deal = {
 
 type NearbyItem = { venue: Venue; deal: Deal | null; distance?: number };
 
+/** Constants */
 const cities: CityKey[] = ['Helsingborg', 'Stockholm', 'Göteborg', 'Malmö'];
 const beerStyles = ['Lager','IPA','APA','DIPA','NEIPA','Pilsner','Porter','Stout','Sour','Wheat','Belgian Ale','Brown Ale','Red Ale','Pale Ale','Kölsch','Vienna Lager'] as const;
 
+/** Helpers */
 function swedenNow(): Date {
   try {
     const fmt = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm', hour12: false, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit'});
@@ -73,7 +78,7 @@ function isOpenNowFromHours(hours:any): boolean | null {
   } catch { return null; }
 }
 
-/** Accessible, lightweight custom select specifically for Sortering */
+/** Accessible, minimal custom select for Sortering */
 function SortSelect({
   value, onChange, t
 }: { value: 'standard'|'cheap'|'nearby'; onChange: (v:'standard'|'cheap'|'nearby')=>void; t:(sv:string,en:string)=>string }) {
@@ -107,11 +112,13 @@ function SortSelect({
   );
 }
 
+/** Page */
 export default function LangPage() {
   const params = useParams<{ lang: string }>();
   const lang = ((params && (params as any).lang) || 'sv') as 'sv' | 'en';
   const t = (sv: string, en: string) => (lang === 'sv' ? sv : en);
 
+  // City with persistence
   const [city, setCity] = useState<CityKey>('Helsingborg');
   useEffect(() => { try { const s = localStorage.getItem('olradar.city'); if (s && (cities as readonly string[]).includes(s)) setCity(s as CityKey); } catch {} }, []);
   useEffect(() => { try { localStorage.setItem('olradar.city', city); } catch {} }, [city]);
@@ -121,15 +128,20 @@ export default function LangPage() {
   const [items, setItems] = useState<NearbyItem[]>([]);
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
 
+  // Modal & form refs
   const modalRef = useRef<HTMLDialogElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const venueInputRef = useRef<HTMLInputElement | null>(null);
   const beerNameRef = useRef<HTMLInputElement | null>(null);
 
+  // Autocomplete lists
   const [venueOptions, setVenueOptions] = useState<string[]>([]);
+
+  // Optimistic marker
   const [justLogged, setJustLogged] = useState<{ venue: string; price: number; style?: string; rating?: number } | null>(null);
   useEffect(()=>{ if(!justLogged) return; const id=window.setTimeout(()=>setJustLogged(null), 12000); return ()=>clearTimeout(id); },[justLogged]);
 
+  // Geoposition → fallback to city coords
   useEffect(() => {
     let canceled = false;
     const fallback = () => { if (!canceled) setPos(CITY_COORDS[city]); };
@@ -142,6 +154,7 @@ export default function LangPage() {
     return () => { canceled = true; };
   }, [city]);
 
+  // Fetchers
   const fetchNearby = useCallback(async (cacheBust=false) => {
     const qs = cacheBust ? `&_=${Date.now()}` : '';
     const res = await fetch(`/api/nearby?city=${encodeURIComponent(city)}&sort=${sort}${qs}`);
@@ -157,6 +170,7 @@ export default function LangPage() {
 
   useEffect(() => { fetchNearby(); }, [fetchNearby]);
 
+  // Distances
   const itemsWithDistance = useMemo(() => {
     if (!pos) return items;
     const d = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
@@ -171,6 +185,7 @@ export default function LangPage() {
     return items.map((it) => ({ ...it, distance: d(pos, { lat: it.venue.lat, lng: it.venue.lng }) }));
   }, [items, pos]);
 
+  // Query + sort
   const filtered = itemsWithDistance
     .filter((it) => {
       if (!q) return true;
@@ -189,6 +204,7 @@ export default function LangPage() {
       return 0;
     });
 
+  // Modal controls
   function openModal(prefillVenue?: string) {
     const el = modalRef.current; if (!el) return;
     const anyEl: any = el as any;
@@ -199,7 +215,6 @@ export default function LangPage() {
       window.setTimeout(() => { beerNameRef.current?.focus(); }, 50);
     }
   }
-
   function closeModal() {
     const el = modalRef.current; if (!el) return;
     const anyEl: any = el as any;
@@ -207,6 +222,7 @@ export default function LangPage() {
     else { el.removeAttribute('open'); }
   }
 
+  // Submit log
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = formRef.current; if (!form) return;
@@ -243,6 +259,7 @@ export default function LangPage() {
               try { if (typeof Notification !== 'undefined') { Notification.requestPermission().then(() => alert(t('Jag pingar när ett fynd dyker upp.', 'I will ping you when a new deal appears.'))); } } catch {}
             }}/>
             <ShareButton title="Ölradar" text={t('Kolla denna ölradar!', 'Check out this beer radar!')} />
+            {/* Floating amber CTA */}
             <button type="button" className="btn-primary fab" onClick={() => openModal()}>
               <Plus size={18} /> {t('Logga öl', 'Log beer')}
             </button>
@@ -274,7 +291,7 @@ export default function LangPage() {
             const optimistic = justLogged && justLogged.venue.toLowerCase() === venue.name.toLowerCase();
             const priceNum = optimistic ? justLogged!.price : (deal && typeof deal.price_sek === 'number' ? (deal.price_sek as number) : null);
             const computedOpen = isOpenNowFromHours(venue.hours);
-            const showOpen = computedOpen === true; // visa endast när vi är säkra
+            const showOpen = computedOpen === true; // only show when certain
             const happy = isHappyHourNow(venue.hours) || (priceNum !== null ? priceNum : 999) <= 39;
 
             return (
@@ -307,6 +324,7 @@ export default function LangPage() {
         </section>
       </FadeIn>
 
+      {/* Modal for logging */}
       <dialog id="log-modal" ref={modalRef} className="backdrop:bg-black/50 rounded-2xl p-0">
         <form ref={formRef} onSubmit={onSubmit} action="/api/log" method="post" encType="multipart/form-data" className="modal-surface w-[min(640px,95vw)]">
           <div className="modal-header">
