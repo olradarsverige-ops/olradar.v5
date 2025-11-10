@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 import { FadeIn, HypeCard, Chip, TrophyPill, BellButton, ShareButton } from '../../components/ui'
@@ -37,6 +37,8 @@ export default function LangPage(){
   const [sort, setSort] = useState<'standard'|'cheap'|'nearby'>('standard')
   const [items, setItems] = useState<NearbyItem[]>([])
   const [pos, setPos] = useState<{lat:number,lng:number}|null>(null)
+
+  const modalRef = useRef<HTMLDialogElement | null>(null)
 
   // for datalist suggestions
   const [venueOptions, setVenueOptions] = useState<string[]>([])
@@ -141,6 +143,25 @@ export default function LangPage(){
     return ()=>{ end.then(()=>{}).catch(()=>{}) }
   }, [])
 
+  function openModal(){
+    const el = modalRef.current
+    if (!el) return
+    // Prefer showModal when available
+    if (typeof (el as any).showModal === 'function') {
+      try { (el as any).showModal() } catch { el.setAttribute('open','') }
+    } else {
+      el.setAttribute('open','')
+    }
+  }
+  function closeModal(){
+    const el = modalRef.current; if (!el) return
+    if (typeof (el as any).close === 'function') {
+      try { (el as any).close() } catch { el.removeAttribute('open') }
+    } else {
+      el.removeAttribute('open')
+    }
+  }
+
   return (
     <main className="space-y-6">
       <FadeIn>
@@ -154,10 +175,7 @@ export default function LangPage(){
               try { Notification.requestPermission().then(()=> alert(t('Jag pingar när ett fynd dyker upp.','I\'ll ping you when a new deal appears.'))) } catch {}
             }}/>
             <ShareButton title="Ölradar" text={t('Kolla denna ölradar!','Check out this beer radar!')}/>
-            <button
-              className="btn"
-              onClick={()=> { const el = document.getElementById('log-modal') as HTMLDialogElement | null; el?.showModal() }}
-            >
+            <button type="button" className="btn" onClick={openModal}>
               <Plus size={16}/> {t('Logga öl','Log beer')}
             </button>
           </div>
@@ -176,7 +194,6 @@ export default function LangPage(){
           </div>
           <div>
             <label className="label">{t('Stad','City')}</label>
-            {/* Replace native select with datalist for readable dropdown on desktop */}
             <input
               list="city-list"
               className="input"
@@ -241,10 +258,7 @@ export default function LangPage(){
                   </div>
                 </div>
                 <div className="px-4 pb-4 flex gap-2">
-                  <button
-                    className="btn"
-                    onClick={()=> { const el = document.getElementById('log-modal') as HTMLDialogElement | null; el?.showModal() }}
-                  >
+                  <button type="button" className="btn" onClick={openModal}>
                     <Camera size={16}/> {t('Logga öl','Log beer')}
                   </button>
                 </div>
@@ -294,7 +308,7 @@ export default function LangPage(){
         </section>
       </FadeIn>
 
-      <dialog id="log-modal" className="backdrop:bg-black/50 rounded-2xl p-0">
+      <dialog id="log-modal" ref={modalRef} className="backdrop:bg-black/50 rounded-2xl p-0">
         <form action="/api/log" method="post" encType="multipart/form-data" className="p-5 space-y-3 bg-neutral-900 rounded-2xl w-[min(560px,92vw)]">
           <h4 className="text-lg font-semibold">{t('Logga en öl','Log a beer')}</h4>
 
@@ -341,7 +355,7 @@ export default function LangPage(){
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" className="btn" onClick={()=> { const el = document.getElementById('log-modal') as HTMLDialogElement | null; el?.close() }}>{t('Avbryt','Cancel')}</button>
+            <button type="button" className="btn" onClick={closeModal}>{t('Avbryt','Cancel')}</button>
             <button className="btn" onClick={()=> setTimeout(()=> fireConfetti(), 200)}>{t('Spara','Save')}</button>
           </div>
         </form>
