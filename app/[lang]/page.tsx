@@ -8,6 +8,7 @@ import Image from 'next/image'
 import { MapPin, Camera, Star, Plus } from 'lucide-react'
 import { xpForLogs, badgeForCount, streakFromDates, isHappyHourNow } from '../../lib/game'
 import { fireConfetti } from '../../components/confetti'
+import { CITY_COORDS, CityKey } from '../../lib/cities'
 
 type Venue = {
   id: string; name: string; address: string; city: string; country: string;
@@ -20,7 +21,7 @@ type Deal = {
   beer?: { name: string, style: string | null, abv: number | null }
 }
 type NearbyItem = { venue: Venue; deal: Deal | null; distance?: number }
-const cities = ['Helsingborg', 'Stockholm', 'Göteborg', 'Malmö'] as const
+const cities: CityKey[] = ['Helsingborg', 'Stockholm', 'Göteborg', 'Malmö']
 const beerStyles = [
   'Lager','IPA','APA','DIPA','NEIPA','Pilsner','Porter','Stout','Sour',
   'Wheat','Belgian Ale','Brown Ale','Red Ale','Pale Ale','Kölsch','Vienna Lager'
@@ -31,7 +32,7 @@ export default function LangPage(){
   const lang = (params?.lang || 'sv') as 'sv' | 'en'
   const t = (sv:string, en:string) => lang==='sv'? sv: en
 
-  const [city, setCity] = useState<typeof cities[number]>('Stockholm')
+  const [city, setCity] = useState<CityKey>('Stockholm')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState<'standard'|'cheap'|'nearby'>('standard')
   const [items, setItems] = useState<NearbyItem[]>([])
@@ -43,13 +44,21 @@ export default function LangPage(){
   const [logsByUser, setLogsByUser] = useState<Record<string,string[]>>({})
   const [countByUser, setCountByUser] = useState<Record<string,number>>({})
 
+  // Try geolocation; fall back to selected city center
   useEffect(()=>{
+    let canceled = false
+    const fallback = () => { if (!canceled) setPos(CITY_COORDS[city]) }
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((p)=>{
-        setPos({lat:p.coords.latitude, lng:p.coords.longitude})
-      }, ()=>{}, { enableHighAccuracy: true, maximumAge: 30000, timeout: 5000 })
+      navigator.geolocation.getCurrentPosition(
+        (p)=>{ if (!canceled) setPos({lat:p.coords.latitude, lng:p.coords.longitude}) },
+        ()=> fallback(),
+        { enableHighAccuracy: true, maximumAge: 30000, timeout: 4000 }
+      )
+    } else {
+      fallback()
     }
-  }, [])
+    return ()=>{ canceled = true }
+  }, [city])
 
   useEffect(()=>{
     const run = async ()=>{
@@ -57,7 +66,6 @@ export default function LangPage(){
       const data = await res.json()
       setItems(data.items || [])
 
-      // populate venue options for current city
       try {
         const r = await fetch(`/api/venues?city=${encodeURIComponent(city)}`)
         const v = await r.json()
@@ -146,10 +154,9 @@ export default function LangPage(){
               try { Notification.requestPermission().then(()=> alert(t('Jag pingar när ett fynd dyker upp.','I\'ll ping you when a new deal appears.'))) } catch {}
             }}/>
             <ShareButton title="Ölradar" text={t('Kolla denna ölradar!','Check out this beer radar!')}/>
-            {/* Global log button so you can log without choosing a venue card */}
             <button
               className="btn"
-              onClick={()=> (document.getElementById('log-modal') as HTMLDialogElement)?.showModal()}
+              onClick={()=> { const el = document.getElementById('log-modal') as HTMLDialogElement | null; el?.showModal() }}
             >
               <Plus size={16}/> {t('Logga öl','Log beer')}
             </button>
@@ -169,9 +176,16 @@ export default function LangPage(){
           </div>
           <div>
             <label className="label">{t('Stad','City')}</label>
-            <select className="card-select" value={city} onChange={e=> setCity(e.target.value as any)}>
-              {cities.map(c=> <option key={c} value={c}>{c}</option>)}
-            </select>
+            {/* Replace native select with datalist for readable dropdown on desktop */}
+            <input
+              list="city-list"
+              className="input"
+              value={city}
+              onChange={(e)=> setCity(e.target.value as CityKey)}
+            />
+            <datalist id="city-list">
+              {cities.map(c => <option key={c} value={c} />)}
+            </datalist>
           </div>
           <div>
             <label className="label">{t('Sortering','Sort')}</label>
@@ -229,7 +243,7 @@ export default function LangPage(){
                 <div className="px-4 pb-4 flex gap-2">
                   <button
                     className="btn"
-                    onClick={()=> (document.getElementById('log-modal') as HTMLDialogElement)?.showModal()}
+                    onClick={()=> { const el = document.getElementById('log-modal') as HTMLDialogElement | null; el?.showModal() }}
                   >
                     <Camera size={16}/> {t('Logga öl','Log beer')}
                   </button>
@@ -280,7 +294,6 @@ export default function LangPage(){
         </section>
       </FadeIn>
 
-      {/* Modal with clearer fields + style dropdown + venue free-typing (datalist) */}
       <dialog id="log-modal" className="backdrop:bg-black/50 rounded-2xl p-0">
         <form action="/api/log" method="post" encType="multipart/form-data" className="p-5 space-y-3 bg-neutral-900 rounded-2xl w-[min(560px,92vw)]">
           <h4 className="text-lg font-semibold">{t('Logga en öl','Log a beer')}</h4>
@@ -328,7 +341,7 @@ export default function LangPage(){
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" className="btn" onClick={()=> (document.getElementById('log-modal') as HTMLDialogElement).close()}>{t('Avbryt','Cancel')}</button>
+            <button type="button" className="btn" onClick={()=> { const el = document.getElementById('log-modal') as HTMLDialogElement | null; el?.close() }}>{t('Avbryt','Cancel')}</button>
             <button className="btn" onClick={()=> setTimeout(()=> fireConfetti(), 200)}>{t('Spara','Save')}</button>
           </div>
         </form>
