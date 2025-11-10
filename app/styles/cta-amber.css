@@ -1,0 +1,93 @@
+/* app/styles/cta-amber.css
+   Amber CTA + dark-mode friendly select and dropdown styling. */
+
+/* Amber scale */
+:root{
+  --cta-amber-300:#fbbf24;
+  --cta-amber-400:#f59e0b;
+  --cta-amber-500:#f59e0b;
+  --cta-amber-600:#d97706;
+  --cta-amber-700:#b45309;
+  --cta-amber-ring:rgba(245,158,11,.45);
+  --cta-amber-glow:0 8px 32px rgba(245,158,11,.35);
+  --layer-1:rgba(255,255,255,.06);
+  --layer-2:rgba(255,255,255,.10);
+  --ink-strong:#0b1020;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --cta-amber-600:#e08a06;
+    --cta-amber-700:#c27705;
+    --cta-amber-ring:rgba(245,158,11,.55);
+    --cta-amber-glow:0 10px 36px rgba(245,158,11,.45);
+  }
+}
+
+/* Primary CTA */
+.btn-primary{
+  color:var(--ink-strong);
+  background:linear-gradient(180deg,var(--cta-amber-500),var(--cta-amber-600));
+  border:1px solid rgba(0,0,0,.12);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.15), var(--cta-amber-glow);
+  transition:transform .06s ease, box-shadow .2s ease, filter .2s ease;
+}
+.btn-primary:hover{
+  filter:brightness(1.02);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),
+             0 0 0 4px var(--cta-amber-ring),
+             var(--cta-amber-glow);
+}
+.btn-primary:active{
+  background:linear-gradient(180deg,var(--cta-amber-600),var(--cta-amber-700));
+  transform:translateY(.5px);
+}
+.btn-primary:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 3px #0b1020, 0 0 0 6px var(--cta-amber-ring), var(--cta-amber-glow);
+}
+
+/* Floating action button (Logga öl uppe till höger) */
+.fab{
+  background:linear-gradient(180deg,var(--cta-amber-500),var(--cta-amber-600)) !important;
+  color:var(--ink-strong) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12), var(--cta-amber-glow) !important;
+}
+.fab:hover{ filter:brightness(1.02); }
+
+/* Dark friendly select + dropdown */
+.card-select,
+.input{
+  color:rgba(255,255,255,.95);
+  background:var(--layer-1);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:.75rem;
+  padding:.7rem .9rem;
+}
+.card-select:focus,
+.card-select:focus-visible,
+.input:focus{
+  outline:none;
+  box-shadow:0 0 0 3px var(--cta-amber-ring);
+}
+
+/* Custom dropdown list for SortSelect */
+.select-trigger{
+  display:inline-flex; align-items:center; gap:.5rem;
+  background:var(--layer-1); color:#fff;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:.75rem; padding:.6rem .9rem;
+}
+.select-trigger:focus-visible{ outline:none; box-shadow:0 0 0 3px var(--cta-amber-ring); }
+.select-pop{
+  position:absolute; z-index:50;
+  min-width:220px; max-height:280px; overflow:auto;
+  padding:.35rem; margin-top:.4rem;
+  background:rgba(12,17,28,.98);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:.9rem; box-shadow:0 12px 40px rgba(0,0,0,.45);
+}
+.select-item{
+  color:#eaeefb; padding:.55rem .7rem; border-radius:.6rem; cursor:pointer;
+}
+.select-item[aria-selected="true"],
+.select-item:hover{ background:rgba(245,158,11,.16); }

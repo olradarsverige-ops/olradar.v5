@@ -4,9 +4,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from '../../lib/supabaseClient';
-import { FadeIn, HypeCard, Chip, TrophyPill, BellButton, ShareButton } from '../../components/ui';
-import { MapPin, Camera, Star, Plus, Beer, Sparkles } from 'lucide-react';
-import { badgeForCount, streakFromDates, isHappyHourNow } from '../../lib/game';
+import { FadeIn, Chip, BellButton, ShareButton } from '../../components/ui';
+import { MapPin, Camera, Star, Plus, Beer, ChevronDown } from 'lucide-react';
+import { isHappyHourNow } from '../../lib/game';
 import { fireConfetti } from '../../components/confetti';
 import { CITY_COORDS, CityKey } from '../../lib/cities';
 
@@ -15,11 +15,11 @@ type Venue = {
   name: string;
   address: string;
   city: string;
-  country: string;
+  country?: string;
   lat: number;
   lng: number;
-  open_now: boolean;
-  hours: any;
+  open_now?: boolean | null;
+  hours?: any;
 };
 
 type Deal = {
@@ -39,78 +39,110 @@ type Deal = {
 type NearbyItem = { venue: Venue; deal: Deal | null; distance?: number };
 
 const cities: CityKey[] = ['Helsingborg', 'Stockholm', 'Göteborg', 'Malmö'];
-const beerStyles = [
-  'Lager','IPA','APA','DIPA','NEIPA','Pilsner','Porter','Stout','Sour',
-  'Wheat','Belgian Ale','Brown Ale','Red Ale','Pale Ale','Kölsch','Vienna Lager'
-] as const;
+const beerStyles = ['Lager','IPA','APA','DIPA','NEIPA','Pilsner','Porter','Stout','Sour','Wheat','Belgian Ale','Brown Ale','Red Ale','Pale Ale','Kölsch','Vienna Lager'] as const;
+
+function swedenNow(): Date {
+  try {
+    const fmt = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm', hour12: false, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit'});
+    const parts = fmt.formatToParts(new Date()).reduce<Record<string,string>>((acc,p)=>{acc[p.type]=p.value;return acc;},{});
+    return new Date(`${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`);
+  } catch {
+    return new Date();
+  }
+}
+
+function isOpenNowFromHours(hours:any): boolean | null {
+  if (!hours) return null;
+  try {
+    const now = swedenNow();
+    const day = now.getDay(); // 0-6
+    const map:any = {0:'sun',1:'mon',2:'tue',3:'wed',4:'thu',5:'fri',6:'sat'};
+    const key = map[day];
+    const ranges = hours[key] || hours[key?.toUpperCase?.()] || hours[key?.toLowerCase?.()];
+    if (!ranges || !Array.isArray(ranges)) return null;
+    const mins = now.getHours()*60 + now.getMinutes();
+    for (const r of ranges) {
+      if (!r) continue;
+      const [from,to] = (r.time || r).split('-');
+      const [fh,fm] = from.split(':').map((x:string)=>parseInt(x,10));
+      const [th,tm] = to.split(':').map((x:string)=>parseInt(x,10));
+      const a = fh*60+fm; const b = th*60+tm;
+      if (a<=mins && mins<=b) return true;
+    }
+    return false;
+  } catch { return null; }
+}
+
+/** Accessible, lightweight custom select specifically for Sortering */
+function SortSelect({
+  value, onChange, t
+}: { value: 'standard'|'cheap'|'nearby'; onChange: (v:'standard'|'cheap'|'nearby')=>void; t:(sv:string,en:string)=>string }) {
+  const [open,setOpen]=useState(false);
+  const ref = useRef<HTMLDivElement|null>(null);
+  useEffect(()=>{
+    const onDoc=(e:MouseEvent)=>{ if(ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown',onDoc); return ()=>document.removeEventListener('mousedown',onDoc);
+  },[]);
+  const items:(['standard'|'cheap'|'nearby',string,string])[] = [
+    ['standard', t('Standard','Standard'),'standard'],
+    ['cheap', t('Billigast','Cheapest'),'cheap'],
+    ['nearby', t('Närmast','Nearby'),'nearby']
+  ];
+  const label = items.find(i=>i[0]===value)?.[1] || t('Standard','Standard');
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" className="select-trigger" aria-haspopup="listbox" aria-expanded={open} onClick={()=>setOpen(!open)}>
+        {label} <ChevronDown size={16}/>
+      </button>
+      {open && (
+        <div className="select-pop" role="listbox" aria-label={t('Sortering','Sort')}>
+          {items.map(([v,text])=>(
+            <div key={v} role="option" aria-selected={v===value} className="select-item" onClick={()=>{ onChange(v); setOpen(false); }}>
+              {text}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function LangPage() {
   const params = useParams<{ lang: string }>();
   const lang = ((params && (params as any).lang) || 'sv') as 'sv' | 'en';
   const t = (sv: string, en: string) => (lang === 'sv' ? sv : en);
 
-  // Persist city (default Helsingborg)
   const [city, setCity] = useState<CityKey>('Helsingborg');
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('olradar.city');
-      if (stored && (cities as readonly string[]).includes(stored)) {
-        setCity(stored as CityKey);
-      }
-    } catch {}
-  }, []);
-  useEffect(() => {
-    try {
-      localStorage.setItem('olradar.city', city);
-    } catch {}
-  }, [city]);
+  useEffect(() => { try { const s = localStorage.getItem('olradar.city'); if (s && (cities as readonly string[]).includes(s)) setCity(s as CityKey); } catch {} }, []);
+  useEffect(() => { try { localStorage.setItem('olradar.city', city); } catch {} }, [city]);
 
   const [q, setQ] = useState<string>('');
   const [sort, setSort] = useState<'standard' | 'cheap' | 'nearby'>('standard');
   const [items, setItems] = useState<NearbyItem[]>([]);
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Modal refs
   const modalRef = useRef<HTMLDialogElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const venueInputRef = useRef<HTMLInputElement | null>(null);
   const beerNameRef = useRef<HTMLInputElement | null>(null);
 
   const [venueOptions, setVenueOptions] = useState<string[]>([]);
-  const [logsByUser, setLogsByUser] = useState<Record<string, string[]>>({});
-  const [countByUser, setCountByUser] = useState<Record<string, number>>({});
-
-  // optimistic UI for last log
   const [justLogged, setJustLogged] = useState<{ venue: string; price: number; style?: string; rating?: number } | null>(null);
-  useEffect(()=>{
-    if (!justLogged) return;
-    const id = window.setTimeout(()=> setJustLogged(null), 12000);
-    return ()=> window.clearTimeout(id);
-  }, [justLogged]);
+  useEffect(()=>{ if(!justLogged) return; const id=window.setTimeout(()=>setJustLogged(null), 12000); return ()=>clearTimeout(id); },[justLogged]);
 
-  // Geolocation with fallback to city
   useEffect(() => {
     let canceled = false;
-    const fallback = () => {
-      if (!canceled) setPos(CITY_COORDS[city]);
-    };
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+    const fallback = () => { if (!canceled) setPos(CITY_COORDS[city]); };
+    if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (p) => {
-          if (!canceled) setPos({ lat: p.coords.latitude, lng: p.coords.longitude });
-        },
-        () => fallback(),
-        { enableHighAccuracy: true, maximumAge: 30000, timeout: 4000 }
+        (p) => { if (!canceled) setPos({ lat: p.coords.latitude, lng: p.coords.longitude }); },
+        () => fallback(), { enableHighAccuracy: true, maximumAge: 30000, timeout: 4000 }
       );
-    } else {
-      fallback();
-    }
-    return () => {
-      canceled = true;
-    };
+    } else { fallback(); }
+    return () => { canceled = true; };
   }, [city]);
 
-  const fetchNearby = useCallback(async (cacheBust = false) => {
+  const fetchNearby = useCallback(async (cacheBust=false) => {
     const qs = cacheBust ? `&_=${Date.now()}` : '';
     const res = await fetch(`/api/nearby?city=${encodeURIComponent(city)}&sort=${sort}${qs}`);
     const data = await res.json();
@@ -121,26 +153,9 @@ export default function LangPage() {
       const v = await r.json();
       setVenueOptions(((v && v.venues) || []).map((x: any) => x.name));
     } catch {}
-
-    const { data: prices } = await supabase
-      .from('prices')
-      .select('user_id, created_at')
-      .gte('created_at', new Date(Date.now() - 1000 * 60 * 60 * 24 * 120).toISOString());
-    const byUser: Record<string, string[]> = {};
-    const counts: Record<string, number> = {};
-    (prices || []).forEach((p: any) => {
-      if (!p.user_id) return;
-      byUser[p.user_id] = byUser[p.user_id] || [];
-      byUser[p.user_id].push(p.created_at);
-      counts[p.user_id] = (counts[p.user_id] || 0) + 1;
-    });
-    setLogsByUser(byUser);
-    setCountByUser(counts);
   }, [city, sort]);
 
-  useEffect(() => {
-    fetchNearby();
-  }, [fetchNearby]);
+  useEffect(() => { fetchNearby(); }, [fetchNearby]);
 
   const itemsWithDistance = useMemo(() => {
     if (!pos) return items;
@@ -174,114 +189,45 @@ export default function LangPage() {
       return 0;
     });
 
-  // weekly leaderboard (left intact)
-  const thisMonday = new Date();
-  const day = thisMonday.getDay();
-  const diff = (day + 6) % 7;
-  thisMonday.setDate(thisMonday.getDate() - diff);
-  thisMonday.setHours(0, 0, 0, 0);
-  const weekly = Object.entries(logsByUser)
-    .map(([user, dates]) => {
-      const count = dates.filter((d) => new Date(d) >= thisMonday).length;
-      return { user, count, xp: count * 10 };
-    })
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-
-  useEffect(() => {
-    const start = async () => {
-      try {
-        if (typeof Notification !== 'undefined') {
-          Notification.requestPermission().catch(() => {});
-        }
-      } catch {}
-      const ch = supabase
-        .channel('prices-insert')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'prices' }, (payload: any) => {
-          const p: any = payload.new;
-          if (p.price_sek != null && p.price_sek <= 39) {
-            const txt = t('Nytt fynd under 39 kr!', 'New deal under 39 SEK!');
-            try {
-              if (typeof Notification !== 'undefined') new Notification('Ölradar', { body: txt });
-            } catch {}
-          }
-        })
-        .subscribe();
-      return () => {
-        supabase.removeChannel(ch);
-      };
-    };
-    const end = start();
-    return () => {
-      Promise.resolve(end).catch(() => {});
-    };
-  }, []);
-
   function openModal(prefillVenue?: string) {
-    const el = modalRef.current;
-    if (!el) return;
+    const el = modalRef.current; if (!el) return;
     const anyEl: any = el as any;
-    if (typeof anyEl.showModal === 'function') {
-      try {
-        anyEl.showModal();
-      } catch {
-        el.setAttribute('open', '');
-      }
-    } else {
-      el.setAttribute('open', '');
-    }
+    if (typeof anyEl.showModal === 'function') { try { anyEl.showModal(); } catch { el.setAttribute('open',''); } }
+    else { el.setAttribute('open',''); }
     if (prefillVenue && venueInputRef.current) {
       venueInputRef.current.value = prefillVenue;
-      window.setTimeout(() => {
-        if (beerNameRef.current) beerNameRef.current.focus();
-      }, 50);
+      window.setTimeout(() => { beerNameRef.current?.focus(); }, 50);
     }
   }
 
   function closeModal() {
-    const el = modalRef.current;
-    if (!el) return;
+    const el = modalRef.current; if (!el) return;
     const anyEl: any = el as any;
-    if (typeof anyEl.close === 'function') {
-      try {
-        anyEl.close();
-      } catch {
-        el.removeAttribute('open');
-      }
-    } else {
-      el.removeAttribute('open');
-    }
+    if (typeof anyEl.close === 'function') { try { anyEl.close(); } catch { el.removeAttribute('open'); } }
+    else { el.removeAttribute('open'); }
   }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const form = formRef.current;
-    if (!form) return;
+    const form = formRef.current; if (!form) return;
     const fd = new FormData(form);
-    // Add API-friendly fields
     const priceStr = (fd.get('price_sek') || '').toString().trim();
     const priceNum = Number(priceStr || '0');
-    fd.set('price_original', priceStr);   // some backends use original+currency
+    fd.set('price_original', priceStr);
     fd.set('currency', 'SEK');
-    fd.set('verified', 'true');           // MVP often expects verified=true to show up
+    fd.set('verified', 'true');
     fd.set('city', city);
-
     try {
       const res = await fetch('/api/log', { method: 'POST', body: fd });
       if (!res.ok) throw new Error('bad status');
-      // Optimistic UI: mark the card immediately
       const venueName = (fd.get('venue_name') || '').toString();
       const style = (fd.get('beer_style') || '').toString();
       const rating = Number((fd.get('rating') || '').toString() || '0') || undefined;
       if (venueName && priceNum > 0) setJustLogged({ venue: venueName, price: priceNum, style, rating });
-
       closeModal();
       window.setTimeout(() => fireConfetti(), 80);
-      // Cache-bust refresh so we don't hit a stale edge cache
       await fetchNearby(true);
-    } catch (err) {
-      alert(t('Något gick fel när loggen skulle sparas.', 'Something went wrong while saving.'));
-    }
+    } catch { alert(t('Något gick fel när loggen skulle sparas.', 'Something went wrong while saving.')); }
   }
 
   return (
@@ -293,17 +239,11 @@ export default function LangPage() {
             <p className="text-white/80">{t('Snabb, snygg och mobilvänlig.', 'Fast, pretty and mobile-first.')}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <BellButton
-              onClick={() => {
-                try {
-                  if (typeof Notification !== 'undefined') {
-                    Notification.requestPermission().then(() => alert(t('Jag pingar när ett fynd dyker upp.', 'I will ping you when a new deal appears.')));
-                  }
-                } catch {}
-              }}
-            />
+            <BellButton onClick={() => {
+              try { if (typeof Notification !== 'undefined') { Notification.requestPermission().then(() => alert(t('Jag pingar när ett fynd dyker upp.', 'I will ping you when a new deal appears.'))); } } catch {}
+            }}/>
             <ShareButton title="Ölradar" text={t('Kolla denna ölradar!', 'Check out this beer radar!')} />
-            <button type="button" className="btn-primary" onClick={() => openModal()}>
+            <button type="button" className="btn-primary fab" onClick={() => openModal()}>
               <Plus size={18} /> {t('Logga öl', 'Log beer')}
             </button>
           </div>
@@ -314,12 +254,7 @@ export default function LangPage() {
         <div className="grid md:grid-cols-[1fr_auto_auto] gap-3 items-end">
           <div>
             <label className="label">{t('Sök', 'Search')}</label>
-            <input
-              placeholder={t('Sök stad eller ställe…', 'Search city or venue…')}
-              className="input"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
+            <input placeholder={t('Sök stad eller ställe…', 'Search city or venue…')} className="input" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
           <div>
             <label className="label">{t('Stad', 'City')}</label>
@@ -328,11 +263,7 @@ export default function LangPage() {
           </div>
           <div>
             <label className="label">{t('Sortering', 'Sort')}</label>
-            <select className="card-select" value={sort} onChange={(e) => setSort(e.target.value as any)}>
-              <option value="standard">{t('Standard', 'Standard')}</option>
-              <option value="cheap">{t('Billigast', 'Cheapest')}</option>
-              <option value="nearby">{t('Närmast', 'Nearby')}</option>
-            </select>
+            <SortSelect value={sort} onChange={(v)=>setSort(v)} t={t} />
           </div>
         </div>
       </FadeIn>
@@ -340,27 +271,14 @@ export default function LangPage() {
       <FadeIn delay={0.1}>
         <section className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(({ venue, deal, distance }) => {
-            const priceNum = deal && typeof deal.price_sek === 'number' ? (deal.price_sek as number) : null;
-
-            // optimistic overlay if we just logged on this venue
             const optimistic = justLogged && justLogged.venue.toLowerCase() === venue.name.toLowerCase();
-
-            const happy = isHappyHourNow(venue.hours) || (priceNum !== null ? priceNum : 999) <= 39 || (optimistic && justLogged!.price <= 39);
-            const styleHue =
-              (optimistic && justLogged?.style?.toLowerCase().includes('ipa')) ? 'from-emerald-500'
-              : (optimistic && justLogged?.style?.toLowerCase().includes('lager')) ? 'from-amber-500'
-              : (deal && deal.beer && deal.beer.style && deal.beer.style.includes('IPA'))
-                ? 'from-emerald-500'
-                : (deal && deal.beer && deal.beer.style && deal.beer.style.includes('Lager'))
-                ? 'from-amber-500'
-                : 'from-indigo-500';
-
-            const shownPrice = optimistic ? justLogged!.price : (priceNum !== null ? priceNum : null);
-            const shownRating = optimistic ? justLogged!.rating : (deal && deal.rating != null ? (deal.rating as number) : null);
+            const priceNum = optimistic ? justLogged!.price : (deal && typeof deal.price_sek === 'number' ? (deal.price_sek as number) : null);
+            const computedOpen = isOpenNowFromHours(venue.hours);
+            const showOpen = computedOpen === true; // visa endast när vi är säkra
+            const happy = isHappyHourNow(venue.hours) || (priceNum !== null ? priceNum : 999) <= 39;
 
             return (
               <div key={venue.id} className="relative overflow-hidden rounded-2xl border border-white/14 bg-white/5">
-                <div className={`absolute inset-0 opacity-20 overlay-safe bg-gradient-to-br ${styleHue} to-transparent`}></div>
                 <div className="p-4 flex gap-3">
                   <div className="w-28 h-28 relative rounded-xl overflow-hidden border border-white/10 shrink-0">
                     <Image src={(deal && deal.photo_url) || '/beer-fallback.png'} alt={venue.name} fill sizes="112px" className="object-cover" />
@@ -368,38 +286,26 @@ export default function LangPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold">{venue.name}</h3>
-                      {happy && <Chip>⚡ {t('Happy Hour', 'Happy Hour')}</Chip>}
-                      {optimistic && <Chip><Sparkles size={14}/> {t('Ny logg','New log')}</Chip>}
-                      {venue.open_now && <Chip>🟢 {t('Öppet', 'Open')}</Chip>}
+                      {showOpen && <Chip>🟢 {t('Öppet', 'Open')}</Chip>}
                       {typeof distance === 'number' && <Chip>🗺️ {distance.toFixed(1)} km</Chip>}
+                      {happy && <Chip>⚡ {t('Happy Hour', 'Happy Hour')}</Chip>}
+                      {optimistic && <Chip>✨ {t('Ny logg','New log')}</Chip>}
                     </div>
-                    <p className="text-white/85 text-sm flex items-center gap-1 mt-1">
-                      <MapPin size={14} /> {venue.address}, {venue.city}
-                    </p>
+                    <p className="text-white/85 text-sm flex items-center gap-1 mt-1"><MapPin size={14} /> {venue.address}, {venue.city}</p>
                     <div className="mt-3 flex items-center gap-3">
-                      <div className="text-lg font-bold">{shownPrice != null ? `${shownPrice.toFixed(0)} SEK` : '—'}</div>
-                      {shownRating != null && (
-                        <span className="inline-flex items-center gap-1 text-sm">
-                          <Star size={14} /> {shownRating.toFixed(1)}
-                        </span>
-                      )}
+                      <div className="text-lg font-bold">{priceNum !== null ? `${priceNum.toFixed(0)} SEK` : '—'}</div>
+                      {deal && deal.rating != null && (<span className="inline-flex items-center gap-1 text-sm"><Star size={14} /> {(deal.rating as number).toFixed(1)}</span>)}
                     </div>
                   </div>
                 </div>
                 <div className="px-4 pb-4 flex gap-2">
-                  <button type="button" className="btn" onClick={() => openModal(venue.name)}>
-                    <Camera size={16} /> {t('Logga öl', 'Log beer')}
-                  </button>
+                  <button type="button" className="btn" onClick={() => openModal(venue.name)}><Camera size={16} /> {t('Logga öl', 'Log beer')}</button>
                 </div>
               </div>
             );
           })}
         </section>
       </FadeIn>
-
-      <button type="button" className="btn-primary fab" onClick={() => openModal()}>
-        <Beer size={18} /> {t('Logga', 'Log')}
-      </button>
 
       <dialog id="log-modal" ref={modalRef} className="backdrop:bg-black/50 rounded-2xl p-0">
         <form ref={formRef} onSubmit={onSubmit} action="/api/log" method="post" encType="multipart/form-data" className="modal-surface w-[min(640px,95vw)]">
@@ -413,7 +319,6 @@ export default function LangPage() {
               <input ref={venueInputRef} name="venue_name" list="venue-list" placeholder={t('Skriv eller välj…','Type or choose…')} required className="input"/>
               <datalist id="venue-list">{venueOptions.map((v) => <option key={v} value={v} />)}</datalist>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="label">{t('Öl (namn)','Beer (name)')}</label>
@@ -425,26 +330,12 @@ export default function LangPage() {
                 <datalist id="beer-style-list">{beerStyles.map((s) => <option key={s} value={s} />)}</datalist>
               </div>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div>
-                <label className="label">SEK</label>
-                <input name="price_sek" type="number" step="1" placeholder="SEK" required className="input"/>
-              </div>
-              <div>
-                <label className="label">{t('Betyg','Rating')}</label>
-                <input name="rating" type="number" step="0.1" min={0} max={5} placeholder="0–5" className="input"/>
-              </div>
-              <div>
-                <label className="label">{t('Stad','City')}</label>
-                <input name="city" value={city} onChange={() => {}} className="input"/>
-              </div>
+              <div><label className="label">SEK</label><input name="price_sek" type="number" step="1" placeholder="SEK" required className="input"/></div>
+              <div><label className="label">{t('Betyg','Rating')}</label><input name="rating" type="number" step="0.1" min={0} max={5} placeholder="0–5" className="input"/></div>
+              <div><label className="label">{t('Stad','City')}</label><input name="city" value={city} onChange={()=>{}} className="input"/></div>
             </div>
-
-            <div>
-              <label className="label">{t('Foto (frivilligt)','Photo (optional)')}</label>
-              <input name="photo" type="file" accept="image/*" className="w-full"/>
-            </div>
+            <div><label className="label">{t('Foto (frivilligt)','Photo (optional)')}</label><input name="photo" type="file" accept="image/*" className="w-full"/></div>
           </div>
           <div className="modal-footer">
             <button type="button" className="btn" onClick={closeModal}>{t('Avbryt','Cancel')}</button>
