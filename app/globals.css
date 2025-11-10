@@ -2,7 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { --glass: rgba(255,255,255,0.08); }
+:root { --glass: rgba(255,255,255,0.10); }
+
 html, body { height: 100%; }
-.gradient-bg { background: linear-gradient(135deg, #06121a 0%, #0a1a24 40%, #101010 100%); }
-.card-glass { @apply rounded-2xl backdrop-blur-md shadow-glass border border-white/10; background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); }
+
+.gradient-bg {
+  background: radial-gradient(60% 60% at 50% 0%, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 60%), 
+              linear-gradient(135deg, #07121b 0%, #0b1b26 40%, #0d1117 100%);
+}
+
+/* Improve default text contrast in dark mode */
+body { color: rgba(255,255,255,0.92); }
+
+/* Inputs & selects: clearer borders, brighter placeholder */
+.input, select.card-select, .card-glass input, .card-glass select, .card-glass textarea {
+  @apply rounded-xl border outline-none w-full;
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.22);
+  color: rgba(255,255,255,0.95);
+  padding: 0.65rem 0.9rem;
+}
+.input::placeholder, .card-glass input::placeholder, .card-glass textarea::placeholder {
+  color: rgba(255,255,255,0.75);
+}
+
+/* Cards */
+.card-glass {
+  @apply rounded-2xl backdrop-blur-md border;
+  border-color: rgba(255,255,255,0.14);
+  background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03));
+  box-shadow: 0 12px 30px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* Buttons */
+.btn {
+  @apply inline-flex items-center gap-2 rounded-xl px-3 py-2 transition border;
+  border-color: rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+}
+.btn:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(0,0,0,0.3); }
+
+/* Labels */
+.label { @apply text-sm opacity-90 mb-1 block; }
+
+/* Make select dropdown text readable on Windows default theme */
+select { color-scheme: dark; }
