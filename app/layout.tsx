@@ -1,13 +1,12 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import { ThemeProvider } from 'next-themes'
-import { ToggleTheme } from '@/components/ui'
+import { ToggleTheme } from '../components/ui'
 
 export const metadata: Metadata = {
   title: 'Ölradar – The Hype Edition',
   description: 'Hitta bästa ölfynden nära dig (sv/en).'
 }
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="sv" suppressHydrationWarning>

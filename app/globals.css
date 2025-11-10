@@ -2,19 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --glass: rgba(255,255,255,0.08);
-}
-
-html, body {
-  height: 100%;
-}
-
-.gradient-bg {
-  background: linear-gradient(135deg, #06121a 0%, #0a1a24 40%, #101010 100%);
-}
-
-.card-glass {
-  @apply rounded-2xl backdrop-blur-md shadow-glass border border-white/10;
-  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
-}
+:root { --glass: rgba(255,255,255,0.08); }
+html, body { height: 100%; }
+.gradient-bg { background: linear-gradient(135deg, #06121a 0%, #0a1a24 40%, #101010 100%); }
+.card-glass { @apply rounded-2xl backdrop-blur-md shadow-glass border border-white/10; background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); }

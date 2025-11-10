@@ -11,9 +11,7 @@ export async function POST(req: NextRequest){
   const rating = form.get('rating') ? Number(form.get('rating')) : null
   const city = String(form.get('city')||'')
 
-  if (!venue_name || !beer_name || !price_sek) {
-    return NextResponse.json({ ok:false, error:'Missing fields' }, { status: 400 })
-  }
+  if (!venue_name || !beer_name || !price_sek) return NextResponse.json({ ok:false, error:'Missing fields' }, { status: 400 })
 
   let venueId: string | null = null
   const { data: v1 } = await supabase.from('venues').select('id').eq('name', venue_name).maybeSingle()
@@ -39,20 +37,11 @@ export async function POST(req: NextRequest){
     const arrayBuffer = await photo.arrayBuffer()
     const bytes = new Uint8Array(arrayBuffer)
     const path = `photos/${Date.now()}-${photo.name}`
-    const { data: up, error: upErr } = await supabase.storage.from(BUCKET).upload(path, bytes, {
-      contentType: photo.type || 'image/jpeg', upsert: false
-    })
-    if (!upErr) {
-      const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path)
-      photo_url = pub.publicUrl
-    }
+    const { data: up, error: upErr } = await supabase.storage.from(BUCKET).upload(path, bytes, { contentType: photo.type || 'image/jpeg', upsert: false })
+    if (!upErr) { const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path); photo_url = pub.publicUrl }
   }
 
   const id = crypto.randomUUID()
-  await supabase.from('prices').insert({
-    id, venue_id: venueId, beer_id: beerId, price_original: price_sek, currency: 'SEK',
-    price_sek, rating, user_id: null, photo_url, ocr_text: null, verified: false
-  })
-
+  await supabase.from('prices').insert({ id, venue_id: venueId, beer_id: beerId, price_original: price_sek, currency: 'SEK', price_sek, rating, user_id: null, photo_url, ocr_text: null, verified: false })
   return NextResponse.redirect(new URL(req.headers.get('referer') || '/', req.url), 303)
 }

@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { FadeIn, HypeCard, ShareButton } from '@/components/ui'
+import { FadeIn, HypeCard, ShareButton } from '../components/ui'
 import { Beer, Languages } from 'lucide-react'
 
 export default function Page(){
