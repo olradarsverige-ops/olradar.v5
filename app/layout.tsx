@@ -1,4 +1,5 @@
 import './globals.css'
+import './styles/cta-amber.css';
 import type { Metadata } from 'next'
 import Providers from '../components/providers'
 import { ToggleTheme } from '../components/ui'
