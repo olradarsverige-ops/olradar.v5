@@ -40,13 +40,10 @@ export default function LangPage(){
 
   const modalRef = useRef<HTMLDialogElement | null>(null)
 
-  // for datalist suggestions
   const [venueOptions, setVenueOptions] = useState<string[]>([])
-
   const [logsByUser, setLogsByUser] = useState<Record<string,string[]>>({})
   const [countByUser, setCountByUser] = useState<Record<string,number>>({})
 
-  // Try geolocation; fall back to selected city center
   useEffect(()=>{
     let canceled = false
     const fallback = () => { if (!canceled) setPos(CITY_COORDS[city]) }
@@ -146,7 +143,6 @@ export default function LangPage(){
   function openModal(){
     const el = modalRef.current
     if (!el) return
-    // Prefer showModal when available
     if (typeof (el as any).showModal === 'function') {
       try { (el as any).showModal() } catch { el.setAttribute('open','') }
     } else {
@@ -224,7 +220,8 @@ export default function LangPage(){
                              'from-indigo-500'
             return (
               <div key={venue.id} className="relative overflow-hidden rounded-2xl border border-white/14 bg-white/5">
-                <div className={`absolute inset-0 opacity-20 bg-gradient-to-br ${styleHue} to-transparent`}></div>
+                {/* Prevent overlay from intercepting clicks */}
+                <div className={`absolute inset-0 opacity-20 pointer-events-none bg-gradient-to-br ${styleHue} to-transparent`}></div>
                 <div className="p-4 flex gap-3">
                   <div className="w-28 h-28 relative rounded-xl overflow-hidden border border-white/10 shrink-0">
                     <Image
@@ -327,10 +324,10 @@ export default function LangPage(){
             </div>
             <div>
               <label className="label">{t('Stil','Style')}</label>
-              <select name="beer_style" className="card-select">
-                <option value="">{t('Välj stil…','Choose style…')}</option>
-                {beerStyles.map(s=> <option key={s} value={s}>{s}</option>)}
-              </select>
+              <input name="beer_style" list="beer-style-list" placeholder={t('Välj eller skriv…','Choose or type…')} className="input"/>
+              <datalist id="beer-style-list">
+                {beerStyles.map(s=> <option key={s} value={s} />)}
+              </datalist>
             </div>
           </div>
 
