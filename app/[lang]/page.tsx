@@ -1,6 +1,7 @@
+
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 import { FadeIn, HypeCard, Chip, TrophyPill, BellButton, ShareButton } from '../../components/ui'
@@ -32,18 +33,35 @@ export default function LangPage(){
   const lang = (params?.lang || 'sv') as 'sv' | 'en'
   const t = (sv:string, en:string) => lang==='sv'? sv: en
 
-  const [city, setCity] = useState<CityKey>('Stockholm')
+  // City preference (persist)
+  const [city, setCity] = useState<CityKey>('Helsingborg')
+  useEffect(()=>{
+    try {
+      const stored = localStorage.getItem('olradar.city')
+      if (stored && cities.includes(stored as CityKey)) setCity(stored as CityKey)
+      else setCity('Helsingborg')
+    } catch {}
+  }, [])
+  useEffect(()=>{
+    try { localStorage.setItem('olradar.city', city) } catch {}
+  }, [city])
+
   const [q, setQ] = useState('')
   const [sort, setSort] = useState<'standard'|'cheap'|'nearby'>('standard')
   const [items, setItems] = useState<NearbyItem[]>([])
   const [pos, setPos] = useState<{lat:number,lng:number}|null>(null)
 
+  // Refs for modal
   const modalRef = useRef<HTMLDialogElement | null>(null)
+  const formRef = useRef<HTMLFormElement | null>(null)
+  const venueInputRef = useRef<HTMLInputElement | null>(null)
+  const beerNameRef = useRef<HTMLInputElement | null>(null)
 
   const [venueOptions, setVenueOptions] = useState<string[]>([])
   const [logsByUser, setLogsByUser] = useState<Record<string,string[]>>({})
   const [countByUser, setCountByUser] = useState<Record<string,number>>({})
 
+  // Geolocation with city fallback
   useEffect(()=>{
     let canceled = false
     const fallback = () => { if (!canceled) setPos(CITY_COORDS[city]) }
@@ -53,38 +71,35 @@ export default function LangPage(){
         ()=> fallback(),
         { enableHighAccuracy: true, maximumAge: 30000, timeout: 4000 }
       )
-    } else {
-      fallback()
-    }
+    } else { fallback() }
     return ()=>{ canceled = true }
   }, [city])
 
-  useEffect(()=>{
-    const run = async ()=>{
-      const res = await fetch(`/api/nearby?city=${encodeURIComponent(city)}&sort=${sort}`)
-      const data = await res.json()
-      setItems(data.items || [])
+  const fetchNearby = useCallback(async ()=>{
+    const res = await fetch(`/api/nearby?city=${encodeURIComponent(city)}&sort=${sort}`)
+    const data = await res.json()
+    setItems(data.items || [])
 
-      try {
-        const r = await fetch(`/api/venues?city=${encodeURIComponent(city)}`)
-        const v = await r.json()
-        setVenueOptions((v.venues||[]).map((x:any)=> x.name))
-      } catch {}
+    try {
+      const r = await fetch(`/api/venues?city=${encodeURIComponent(city)}`)
+      const v = await r.json()
+      setVenueOptions((v.venues||[]).map((x:any)=> x.name))
+    } catch {}
 
-      const { data: prices } = await supabase.from('prices').select('user_id, created_at').gte('created_at', new Date(Date.now()-1000*60*60*24*120).toISOString())
-      const byUser: Record<string,string[]> = {}
-      const counts: Record<string,number> = {}
-      ;(prices||[]).forEach(p=>{
-        if (!p.user_id) return
-        byUser[p.user_id] = byUser[p.user_id] || []
-        byUser[p.user_id].push(p.created_at)
-        counts[p.user_id] = (counts[p.user_id]||0)+1
-      })
-      setLogsByUser(byUser)
-      setCountByUser(counts)
-    }
-    run()
+    const { data: prices } = await supabase.from('prices').select('user_id, created_at').gte('created_at', new Date(Date.now()-1000*60*60*24*120).toISOString())
+    const byUser: Record<string,string[]> = {}
+    const counts: Record<string,number> = {}
+    ;(prices||[]).forEach(p=>{
+      if (!p.user_id) return
+      byUser[p.user_id] = byUser[p.user_id] || []
+      byUser[p.user_id].push(p.created_at)
+      counts[p.user_id] = (counts[p.user_id]||0)+1
+    })
+    setLogsByUser(byUser)
+    setCountByUser(counts)
   }, [city, sort])
+
+  useEffect(()=>{ fetchNearby() }, [fetchNearby])
 
   const itemsWithDistance = useMemo(()=>{
     if (!pos) return items
@@ -140,18 +155,43 @@ export default function LangPage(){
     return ()=>{ end.then(()=>{}).catch(()=>{}) }
   }, [])
 
-  function openModal(){
+  function openModal(prefillVenue?: string){
     const el = modalRef.current
     if (!el) return
     if (typeof (el as any).showModal === 'function') {
       try { (el as any).showModal() } catch { el.setAttribute('open','') }
     } else { el.setAttribute('open','') }
+
+    // Prefill venue and focus beer-name
+    if (prefillVenue && venueInputRef.current) {
+      venueInputRef.current.value = prefillVenue
+      setTimeout(()=> beerNameRef.current?.focus(), 50)
+    }
   }
   function closeModal(){
     const el = modalRef.current; if (!el) return
     if (typeof (el as any).close === 'function') {
       try { (el as any).close() } catch { el.removeAttribute('open') }
     } else { el.removeAttribute('open') }
+  }
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>){
+    e.preventDefault()
+    const form = formRef.current
+    if (!form) return
+    const fd = new FormData(form)
+    // Ensure city persists (in case user typed over it)
+    fd.set('city', city)
+    try {
+      const res = await fetch('/api/log', { method: 'POST', body: fd })
+      if (!res.ok) throw new Error('bad status')
+      // success: close, confetti, refresh
+      closeModal()
+      setTimeout(()=> fireConfetti(), 100)
+      await fetchNearby()
+    } catch (err) {
+      alert(t('Något gick fel när loggen skulle sparas.','Something went wrong while saving.'))
+    }
   }
 
   return (
@@ -164,11 +204,10 @@ export default function LangPage(){
           </div>
           <div className="flex flex-wrap gap-2">
             <BellButton onClick={()=>{
-              try { Notification.requestPermission().then(()=> alert(t('Jag pingar när ett fynd dyker upp.','I\'ll ping you when a new deal appears.'))) } catch {}
+              try { Notification.requestPermission().then(()=> alert(t('Jag pingar när ett fynd dyker upp.','I\\'ll ping you when a new deal appears.'))) } catch {}
             }}/>
             <ShareButton title="Ölradar" text={t('Kolla denna ölradar!','Check out this beer radar!')}/>
-            {/* Primary CTA */}
-            <button type="button" className="btn-primary" onClick={openModal}>
+            <button type="button" className="btn-primary" onClick={()=> openModal()}>
               <Plus size={18}/> {t('Logga öl','Log beer')}
             </button>
           </div>
@@ -206,7 +245,6 @@ export default function LangPage(){
                              'from-indigo-500'
             return (
               <div key={venue.id} className="relative overflow-hidden rounded-2xl border border-white/14 bg-white/5">
-                {/* prevent overlay from stealing clicks */}
                 <div className={`absolute inset-0 opacity-20 overlay-safe bg-gradient-to-br ${styleHue} to-transparent`}></div>
                 <div className="p-4 flex gap-3">
                   <div className="w-28 h-28 relative rounded-xl overflow-hidden border border-white/10 shrink-0">
@@ -229,7 +267,7 @@ export default function LangPage(){
                   </div>
                 </div>
                 <div className="px-4 pb-4 flex gap-2">
-                  <button type="button" className="btn" onClick={openModal}>
+                  <button type="button" className="btn" onClick={()=> openModal(venue.name)}>
                     <Camera size={16}/> {t('Logga öl','Log beer')}
                   </button>
                 </div>
@@ -239,28 +277,27 @@ export default function LangPage(){
         </section>
       </FadeIn>
 
-      {/* Floating action button for mobile */}
-      <button type="button" className="btn-primary fab" onClick={openModal}>
+      <button type="button" className="btn-primary fab" onClick={()=> openModal()}>
         <Beer size={18}/> {t('Logga','Log')}
       </button>
 
       <dialog id="log-modal" ref={modalRef} className="backdrop:bg-black/50 rounded-2xl p-0">
-        <div className="modal-surface w-[min(640px,95vw)]">
+        <form ref={formRef} onSubmit={onSubmit} action="/api/log" method="post" encType="multipart/form-data" className="modal-surface w-[min(640px,95vw)]">
           <div className="modal-header">
             <div className="modal-title flex items-center gap-2"><Beer size={18}/> {t('Logga en öl','Log a beer')}</div>
-            <button className="btn-ghost" onClick={closeModal}>✕</button>
+            <button className="btn-ghost" type="button" onClick={closeModal}>✕</button>
           </div>
           <div className="modal-body space-y-4">
             <div>
               <label className="label">{t('Ställe','Venue')}</label>
-              <input name="venue_name" list="venue-list" placeholder={t('Skriv eller välj…','Type or choose…')} required className="input"/>
+              <input ref={venueInputRef} name="venue_name" list="venue-list" placeholder={t('Skriv eller välj…','Type or choose…')} required className="input"/>
               <datalist id="venue-list">{venueOptions.map(v => <option key={v} value={v} />)}</datalist>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="label">{t('Öl (namn)','Beer (name)')}</label>
-                <input name="beer_name" placeholder={t('Ex: Pilsner Urquell','e.g., Pilsner Urquell')} required className="input"/>
+                <input ref={beerNameRef} name="beer_name" placeholder={t('Ex: Pilsner Urquell','e.g., Pilsner Urquell')} required className="input"/>
               </div>
               <div>
                 <label className="label">{t('Stil','Style')}</label>
@@ -291,9 +328,9 @@ export default function LangPage(){
           </div>
           <div className="modal-footer">
             <button type="button" className="btn" onClick={closeModal}>{t('Avbryt','Cancel')}</button>
-            <button className="btn-primary" onClick={()=> setTimeout(()=> fireConfetti(), 200)}>{t('Spara','Save')}</button>
+            <button className="btn-primary" type="submit">{t('Spara','Save')}</button>
           </div>
-        </div>
+        </form>
       </dialog>
     </main>
   )
