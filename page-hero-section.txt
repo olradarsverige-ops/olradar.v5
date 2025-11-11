@@ -1,0 +1,58 @@
+{/* --- HERO START (drop-in) --- */}
+{/* Requirements in scope: FadeIn, BellButton, ShareButton, t(sv,en), openModal() */}
+<FadeIn>
+  <section className="relative rounded-2xl border border-white/10 bg-white/[.04] overflow-hidden">
+    <div className="grid lg:grid-cols-2 gap-6 items-center p-5 sm:p-6 lg:p-8">
+      {/* Left: text + actions */}
+      <div className="relative z-10">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-white/90 text-sm mb-3">
+          <span className="font-medium">Ölradar / BeerRadar</span>
+        </div>
+
+        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight">
+          {t('Du loggar – andra hittar.', 'You log – others find.')}
+        </h2>
+
+        <p className="mt-2 text-white/80 max-w-xl">
+          {t(
+            'Logga ölen där du är. Hjälp andra att hitta bra priser. Tillsammans håller vi kartan levande.',
+            'Log the beer where you are. Help others find good prices. Together we keep the map alive.'
+          )}
+        </p>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          <BellButton
+            onClick={() => {
+              try {
+                if (typeof Notification !== 'undefined') {
+                  Notification.requestPermission().then(() =>
+                    alert(t('Jag pingar när ett fynd dyker upp.', 'I will ping you when a new deal appears.'))
+                  );
+                }
+              } catch {}
+            }}
+          />
+          <ShareButton title="Ölradar" text={t('Kolla denna ölradar!', 'Check out this beer radar!')} />
+          <button type="button" className="btn-primary fab" onClick={() => openModal()}>
+            {t('Logga öl', 'Log beer')}
+          </button>
+        </div>
+      </div>
+
+      {/* Right: header/hero image */}
+      <div className="relative aspect-[16/9] lg:aspect-[7/5] rounded-xl overflow-hidden border border-white/10">
+        <Image
+          src="/images/beer-radar-hero.png"
+          alt={t('Ölradar / BeerRadar – Du loggar, andra hittar', 'BeerRadar – You log, others find')}
+          fill
+          sizes="(max-width:1024px) 100vw, 50vw"
+          priority
+          className="object-cover"
+        />
+        {/* Subtle glass/gradient overlay */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-black/20 via-transparent to-white/5" />
+      </div>
+    </div>
+  </section>
+</FadeIn>
+{/* --- HERO END --- */}
