@@ -1,10 +1,10 @@
+\
+// app/[lang]/page.tsx
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
-
-// relative imports only (no "@/")
 import { supabase } from '../../lib/supabaseClient';
 import { FadeIn, Chip, BellButton, ShareButton } from '../../components/ui';
 import { MapPin, Camera, Star, Plus, Beer, ChevronDown } from 'lucide-react';
@@ -12,55 +12,22 @@ import { isHappyHourNow } from '../../lib/game';
 import { fireConfetti } from '../../components/confetti';
 import { CITY_COORDS, CityKey } from '../../lib/cities';
 
-/** Types */
-type Venue = {
-  id: string;
-  name: string;
-  address: string;
-  city: string;
-  country?: string;
-  lat: number;
-  lng: number;
-  open_now?: boolean | null;
-  hours?: any;
-};
-
-type Deal = {
-  id: string;
-  price_sek: number | null;
-  price_original: number | null;
-  currency: string | null;
-  rating: number | null;
-  user_id: string | null;
-  photo_url: string | null;
-  created_at: string;
-  venue_id: string;
-  beer_id: string | null;
-  beer?: { name: string; style: string | null; abv: number | null } | null;
-};
-
+type Venue = { id:string; name:string; address:string; city:string; country?:string; lat:number; lng:number; open_now?:boolean|null; hours?:any; };
+type Deal = { id:string; price_sek:number|null; price_original:number|null; currency:string|null; rating:number|null; user_id:string|null; photo_url:string|null; created_at:string; venue_id:string; beer_id:string|null; beer?: { name:string; style:string|null; abv:number|null } | null; };
 type NearbyItem = { venue: Venue; deal: Deal | null; distance?: number };
 
-/** Constants */
-const cities: CityKey[] = ['Helsingborg', 'Stockholm', 'Göteborg', 'Malmö'];
-const beerStyles = ['Lager','IPA','APA','DIPA','NEIPA','Pilsner','Porter','Stout','Sour','Wheat','Belgian Ale','Brown Ale','Red Ale','Pale Ale','Kölsch','Vienna Lager'] as const;
-
-/** Helpers */
 function swedenNow(): Date {
   try {
     const fmt = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm', hour12: false, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit'});
     const parts = fmt.formatToParts(new Date()).reduce<Record<string,string>>((acc,p)=>{acc[p.type]=p.value;return acc;},{});
     return new Date(`${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`);
-  } catch {
-    return new Date();
-  }
+  } catch { return new Date(); }
 }
-
 function isOpenNowFromHours(hours:any): boolean | null {
   if (!hours) return null;
   try {
     const now = swedenNow();
-    const day = now.getDay(); // 0-6
+    const day = now.getDay();
     const map:any = {0:'sun',1:'mon',2:'tue',3:'wed',4:'thu',5:'fri',6:'sat'};
     const key = map[day];
     const ranges = hours[key] || hours[key?.toUpperCase?.()] || hours[key?.toLowerCase?.()];
@@ -78,10 +45,30 @@ function isOpenNowFromHours(hours:any): boolean | null {
   } catch { return null; }
 }
 
-/** Accessible, minimal custom select for Sortering */
-function SortSelect({
-  value, onChange, t
-}: { value: 'standard'|'cheap'|'nearby'; onChange: (v:'standard'|'cheap'|'nearby')=>void; t:(sv:string,en:string)=>string }) {
+function useIsMobilePicker() {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    try {
+      const ua = navigator.userAgent || '';
+      const isiOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1);
+      const smallScreen = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+      setMobile(isiOS || smallScreen);
+    } catch {
+      setMobile(false);
+    }
+  }, []);
+  return mobile;
+}
+
+const BEER_STYLES = [
+  'Lager','Pilsner','Helles','Kellerbier','Märzen','Vienna Lager','Kölsch',
+  'Pale Ale','APA','IPA','Session IPA','West Coast IPA','NEIPA','DIPA','TIPA',
+  'Amber Ale','Red Ale','Brown Ale','Scotch Ale','Porter','Stout','Dry Stout','Milk Stout','Imperial Stout',
+  'Wheat','Hefeweizen','Witbier','Saison','Farmhouse','Belgian Blonde','Belgian Dubbel','Belgian Tripel','Belgian Strong Ale',
+  'Bock','Doppelbock','Barleywine','Sour','Gose','Berliner Weisse','Lambic','Gueuze','Flanders Red','Gluten-Free','Non-Alcoholic'
+] as const;
+
+function SortSelect({ value, onChange, t }:{ value:'standard'|'cheap'|'nearby'; onChange:(v:'standard'|'cheap'|'nearby')=>void; t:(sv:string,en:string)=>string }) {
   const [open,setOpen]=useState(false);
   const ref = useRef<HTMLDivElement|null>(null);
   useEffect(()=>{
@@ -112,15 +99,31 @@ function SortSelect({
   );
 }
 
-/** Page */
+function BeerStylePicker({ name, value, onChange, t }:{ name:string; value:string; onChange:(v:string)=>void; t:(sv:string,en:string)=>string }) {
+  const mobile = useIsMobilePicker();
+  if (mobile) {
+    return (
+      <select name={name} value={value} onChange={(e)=>onChange(e.target.value)} className="card-select w-full">
+        <option value="">{t('Välj stil','Choose style')}</option>
+        {BEER_STYLES.map((s)=> <option key={s} value={s}>{s}</option>)}
+      </select>
+    );
+  }
+  return (
+    <>
+      <input name={name} value={value} onChange={(e)=>onChange(e.target.value)} list="beer-style-list" placeholder={t('Välj eller skriv…','Choose or type…')} className="input" />
+      <datalist id="beer-style-list">{BEER_STYLES.map((s)=> <option key={s} value={s} />)}</datalist>
+    </>
+  );
+}
+
 export default function LangPage() {
   const params = useParams<{ lang: string }>();
   const lang = ((params && (params as any).lang) || 'sv') as 'sv' | 'en';
   const t = (sv: string, en: string) => (lang === 'sv' ? sv : en);
 
-  // City with persistence
   const [city, setCity] = useState<CityKey>('Helsingborg');
-  useEffect(() => { try { const s = localStorage.getItem('olradar.city'); if (s && (cities as readonly string[]).includes(s)) setCity(s as CityKey); } catch {} }, []);
+  useEffect(() => { try { const s = localStorage.getItem('olradar.city'); if (s && (['Helsingborg','Stockholm','Göteborg','Malmö'] as const).includes(s as any)) setCity(s as CityKey); } catch {} }, []);
   useEffect(() => { try { localStorage.setItem('olradar.city', city); } catch {} }, [city]);
 
   const [q, setQ] = useState<string>('');
@@ -128,20 +131,16 @@ export default function LangPage() {
   const [items, setItems] = useState<NearbyItem[]>([]);
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Modal & form refs
   const modalRef = useRef<HTMLDialogElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const venueInputRef = useRef<HTMLInputElement | null>(null);
   const beerNameRef = useRef<HTMLInputElement | null>(null);
 
-  // Autocomplete lists
   const [venueOptions, setVenueOptions] = useState<string[]>([]);
-
-  // Optimistic marker
+  const [beerStyle, setBeerStyle] = useState<string>('');
   const [justLogged, setJustLogged] = useState<{ venue: string; price: number; style?: string; rating?: number } | null>(null);
   useEffect(()=>{ if(!justLogged) return; const id=window.setTimeout(()=>setJustLogged(null), 12000); return ()=>clearTimeout(id); },[justLogged]);
 
-  // Geoposition → fallback to city coords
   useEffect(() => {
     let canceled = false;
     const fallback = () => { if (!canceled) setPos(CITY_COORDS[city]); };
@@ -154,7 +153,6 @@ export default function LangPage() {
     return () => { canceled = true; };
   }, [city]);
 
-  // Fetchers
   const fetchNearby = useCallback(async (cacheBust=false) => {
     const qs = cacheBust ? `&_=${Date.now()}` : '';
     const res = await fetch(`/api/nearby?city=${encodeURIComponent(city)}&sort=${sort}${qs}`);
@@ -170,7 +168,6 @@ export default function LangPage() {
 
   useEffect(() => { fetchNearby(); }, [fetchNearby]);
 
-  // Distances
   const itemsWithDistance = useMemo(() => {
     if (!pos) return items;
     const d = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
@@ -185,7 +182,6 @@ export default function LangPage() {
     return items.map((it) => ({ ...it, distance: d(pos, { lat: it.venue.lat, lng: it.venue.lng }) }));
   }, [items, pos]);
 
-  // Query + sort
   const filtered = itemsWithDistance
     .filter((it) => {
       if (!q) return true;
@@ -204,7 +200,6 @@ export default function LangPage() {
       return 0;
     });
 
-  // Modal controls
   function openModal(prefillVenue?: string) {
     const el = modalRef.current; if (!el) return;
     const anyEl: any = el as any;
@@ -222,7 +217,6 @@ export default function LangPage() {
     else { el.removeAttribute('open'); }
   }
 
-  // Submit log
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = formRef.current; if (!form) return;
@@ -249,22 +243,35 @@ export default function LangPage() {
   return (
     <main className="space-y-6">
       <FadeIn>
-        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold">{t('Hitta ölfynd', 'Find beer deals')}</h2>
-            <p className="text-white/80">{t('Snabb, snygg och mobilvänlig.', 'Fast, pretty and mobile-first.')}</p>
+        <section className="relative rounded-2xl border border-white/10 bg-white/[.04] overflow-hidden">
+          <div className="grid lg:grid-cols-2 gap-6 items-center p-5 sm:p-6 lg:p-8">
+            <div className="relative z-10">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-white/90 text-sm mb-3">
+                <span className="font-medium">Ölradar / BeerRadar</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight">
+                {t('Du loggar – andra hittar.', 'You log – others find.')}
+              </h2>
+              <p className="mt-2 text-white/80 max-w-xl">
+                {t('Logga ölen där du är. Hjälp andra att hitta bra priser. Tillsammans håller vi kartan levande.',
+                   'Log the beer where you are. Help others find good prices. Together we keep the map alive.')}
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <BellButton onClick={() => {
+                  try { if (typeof Notification !== 'undefined') { Notification.requestPermission().then(() => alert(t('Jag pingar när ett fynd dyker upp.', 'I will ping you when a new deal appears.'))); } } catch {}
+                }}/>
+                <ShareButton title="Ölradar" text={t('Kolla denna ölradar!', 'Check out this beer radar!')} />
+                <button type="button" className="btn-primary fab" onClick={() => openModal()}>
+                  <Plus size={18} /> {t('Logga öl', 'Log beer')}
+                </button>
+              </div>
+            </div>
+            <div className="relative aspect-[16/9] lg:aspect-[7/5] rounded-xl overflow-hidden border border-white/10">
+              <Image src="/images/beer-radar-hero.png" alt="Ölradar / BeerRadar" fill sizes="(max-width:1024px) 100vw, 50vw" priority className="object-cover" />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-black/20 via-transparent to-white/5" />
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <BellButton onClick={() => {
-              try { if (typeof Notification !== 'undefined') { Notification.requestPermission().then(() => alert(t('Jag pingar när ett fynd dyker upp.', 'I will ping you when a new deal appears.'))); } } catch {}
-            }}/>
-            <ShareButton title="Ölradar" text={t('Kolla denna ölradar!', 'Check out this beer radar!')} />
-            {/* Floating amber CTA */}
-            <button type="button" className="btn-primary fab" onClick={() => openModal()}>
-              <Plus size={18} /> {t('Logga öl', 'Log beer')}
-            </button>
-          </div>
-        </div>
+        </section>
       </FadeIn>
 
       <FadeIn delay={0.05}>
@@ -276,7 +283,7 @@ export default function LangPage() {
           <div>
             <label className="label">{t('Stad', 'City')}</label>
             <input list="city-list" className="input" value={city} onChange={(e) => setCity(e.target.value as CityKey)} />
-            <datalist id="city-list">{cities.map((c) => <option key={c} value={c} />)}</datalist>
+            <datalist id="city-list">{(['Helsingborg','Stockholm','Göteborg','Malmö'] as const).map((c) => <option key={c} value={c} />)}</datalist>
           </div>
           <div>
             <label className="label">{t('Sortering', 'Sort')}</label>
@@ -291,7 +298,7 @@ export default function LangPage() {
             const optimistic = justLogged && justLogged.venue.toLowerCase() === venue.name.toLowerCase();
             const priceNum = optimistic ? justLogged!.price : (deal && typeof deal.price_sek === 'number' ? (deal.price_sek as number) : null);
             const computedOpen = isOpenNowFromHours(venue.hours);
-            const showOpen = computedOpen === true; // only show when certain
+            const showOpen = computedOpen === true;
             const happy = isHappyHourNow(venue.hours) || (priceNum !== null ? priceNum : 999) <= 39;
 
             return (
@@ -303,10 +310,10 @@ export default function LangPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold">{venue.name}</h3>
-                      {showOpen && <Chip>🟢 {t('Öppet', 'Open')}</Chip>}
-                      {typeof distance === 'number' && <Chip>🗺️ {distance.toFixed(1)} km</Chip>}
-                      {happy && <Chip>⚡ {t('Happy Hour', 'Happy Hour')}</Chip>}
-                      {optimistic && <Chip>✨ {t('Ny logg','New log')}</Chip>}
+                      {showOpen && <span className="inline-flex px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-xs">🟢 {t('Öppet', 'Open')}</span>}
+                      {typeof distance === 'number' && <span className="inline-flex px-2 py-0.5 rounded-full bg-white/10 text-white/80 text-xs">🗺️ {distance.toFixed(1)} km</span>}
+                      {happy && <span className="inline-flex px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-200 text-xs">⚡ {t('Happy Hour', 'Happy Hour')}</span>}
+                      {optimistic && <span className="inline-flex px-2 py-0.5 rounded-full bg-fuchsia-500/20 text-fuchsia-200 text-xs">✨ {t('Ny logg','New log')}</span>}
                     </div>
                     <p className="text-white/85 text-sm flex items-center gap-1 mt-1"><MapPin size={14} /> {venue.address}, {venue.city}</p>
                     <div className="mt-3 flex items-center gap-3">
@@ -324,7 +331,6 @@ export default function LangPage() {
         </section>
       </FadeIn>
 
-      {/* Modal for logging */}
       <dialog id="log-modal" ref={modalRef} className="backdrop:bg-black/50 rounded-2xl p-0">
         <form ref={formRef} onSubmit={onSubmit} action="/api/log" method="post" encType="multipart/form-data" className="modal-surface w-[min(640px,95vw)]">
           <div className="modal-header">
@@ -344,8 +350,7 @@ export default function LangPage() {
               </div>
               <div>
                 <label className="label">{t('Stil','Style')}</label>
-                <input name="beer_style" list="beer-style-list" placeholder={t('Välj eller skriv…','Choose or type…')} className="input"/>
-                <datalist id="beer-style-list">{beerStyles.map((s) => <option key={s} value={s} />)}</datalist>
+                <BeerStylePicker name="beer_style" value={beerStyle} onChange={setBeerStyle} t={t} />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

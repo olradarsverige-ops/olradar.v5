@@ -1,37 +1,34 @@
-'use client'
-import Link from 'next/link'
-import { FadeIn, HypeCard, ShareButton } from '../components/ui'
-import { Beer, Languages } from 'lucide-react'
+// app/page.tsx
+import Image from "next/image";
+import Link from "next/link";
 
-export default function Page(){
+export default function Home() {
   return (
-    <main className="space-y-8">
-      <FadeIn>
-        <div className="relative overflow-hidden rounded-3xl p-8 border border-white/10 bg-radial">
-          <div className="absolute inset-0 -z-10 opacity-30 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-600 via-pink-500 to-indigo-500"></div>
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-6 justify-between">
-            <div>
-              <h2 className="text-4xl font-bold">BeerRadar — The Hype Edition</h2>
-              <p className="text-white/80 mt-2">Svenska eller engelska? Samma kärna, dubbelt så mycket skum.</p>
-              <div className="flex gap-3 mt-5">
-                <Link href="/sv" className="card-glass px-4 py-2 hover:scale-[1.02] transition inline-flex items-center gap-2">
-                  <Beer size={18}/> Svenska
-                </Link>
-                <Link href="/en" className="card-glass px-4 py-2 hover:scale-[1.02] transition inline-flex items-center gap-2">
-                  <Languages size={18}/> English
-                </Link>
-                <ShareButton title="Ölradar" text="Kolla denna ölradar!"/>
-              </div>
+    <main className="min-h-screen gradient-bg text-white">
+      <section className="max-w-6xl mx-auto px-4 py-12">
+        <div className="rounded-2xl p-8 backdrop-blur-lg bg-white/5 border border-white/10 shadow-xl relative overflow-hidden">
+          <div className="absolute inset-0 opacity-30">
+            <Image src="/images/beer-radar-hero.png" alt="BeerRadar hero" fill style={{ objectFit: "cover" }} priority />
+          </div>
+          <div className="relative z-10">
+            <h1 className="text-4xl font-bold mb-4">BeerRadar / Ölradar</h1>
+            <p className="text-lg opacity-90 max-w-2xl mb-6">
+              Du loggar – andra hittar. Hjälp andra hitta billiga öl genom att logga priser där du är.
+            </p>
+            <div className="flex flex-wrap gap-3 mb-8">
+              <Link href="/sv" className="px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 transition">Svenska</Link>
+              <Link href="/en" className="px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 transition">English</Link>
+              <button onClick={() => navigator.share?.({ title: "Ölradar", url: typeof window !== 'undefined' ? window.location.href : '/' })} className="px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 transition">Dela</button>
             </div>
-            <div className="grid grid-cols-2 gap-3 w-full md:w-auto">
-              <HypeCard><div className="text-sm">✨ Gradients & glass</div></HypeCard>
-              <HypeCard><div className="text-sm">🏆 XP, badges, streaks</div></HypeCard>
-              <HypeCard><div className="text-sm">🔔 Deal Alerts</div></HypeCard>
-              <HypeCard><div className="text-sm">🗺️ Nearby sort</div></HypeCard>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 bg-white/10 rounded-xl text-sm">✨ Gradients & glass</div>
+              <div className="p-4 bg-white/10 rounded-xl text-sm">🏆 XP, badges, streaks</div>
+              <div className="p-4 bg-white/10 rounded-xl text-sm">🔔 Deal alerts</div>
+              <div className="p-4 bg-white/10 rounded-xl text-sm">📍 Nearby sort</div>
             </div>
           </div>
         </div>
-      </FadeIn>
+      </section>
     </main>
-  )
+  );
 }
