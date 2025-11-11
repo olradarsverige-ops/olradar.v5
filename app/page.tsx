@@ -1,9 +1,9 @@
-// app/page.tsx — Landing v2 (refined hero visuals)
+// app/page.tsx — Landing (hero only on start, not on /[lang])
 import Link from 'next/link'
 
 export const metadata = {
   title: 'Ölradar – Du loggar, andra hittar',
-  description: 'Hjälp andra att hitta bra ölpriser. Du loggar där du sitter, andra hittar.',
+  description: 'Logga ölen där du är. Hjälp andra hitta bra priser. Tillsammans håller vi kartan levande.',
 };
 
 export default function Page() {
@@ -11,22 +11,18 @@ export default function Page() {
     <main className="px-4 py-8 md:py-10">
       <div className="mx-auto max-w-6xl space-y-10">
         {/* HERO */}
-        <section className="relative rounded-2xl overflow-hidden border border-white/10">
-          {/* Background image */}
+        <section className="relative rounded-2xl overflow-hidden border border-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
+          {/* Background image (can be replaced; keep path) */}
           <div
             className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: 'url(/images/beer-radar-hero-bg.jpg)' }}
+            style={{ backgroundImage: 'url(/images/beer-radar-hero-bg.jpg?v=1)' }}
             aria-hidden
           />
-          {/* Soft gradient wash */}
-          <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/40 to-black/10" aria-hidden />
-          {/* Radial focus on left */}
+          {/* Readability washes */}
+          <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/45 to-black/10" aria-hidden />
           <div
             className="absolute inset-0"
-            style={{
-              backgroundImage:
-                'radial-gradient(800px 400px at 20% 45%, rgba(0,0,0,0.0), rgba(0,0,0,0.55))',
-            }}
+            style={{ backgroundImage: 'radial-gradient(900px 420px at 22% 45%, transparent 0%, rgba(0,0,0,.55) 65%)' }}
             aria-hidden
           />
 
@@ -34,7 +30,7 @@ export default function Page() {
           <div className="relative grid md:grid-cols-2 gap-8 md:gap-10 p-8 md:p-12">
             <div className="self-center">
               <span className="inline-flex items-center gap-2 mb-3 text-sm px-3 py-1 rounded-full bg-white/10 backdrop-blur">
-                <span className="i">🍺</span> Ölradar / BeerRadar
+                <span>🍺</span> Ölradar / BeerRadar
               </span>
 
               <h1 className="text-4xl md:text-5xl font-semibold tracking-tight leading-tight">
@@ -69,7 +65,7 @@ export default function Page() {
               </div>
             </div>
 
-            {/* Right visual spacer to keep balance; keeps layout tight */}
+            {/* Spacer for balance on desktop */}
             <div className="hidden md:block" />
           </div>
         </section>
