@@ -1,10 +1,16 @@
-# Patch: Landing hero only (Option 2)
-Detta paket gör två saker:
-1) Uppdaterar **app/page.tsx** med den förbättrade hero-sektionen.
-2) Lägger en optimerad bakgrundsbild på **public/images/beer-radar-hero-bg.jpg** (över-skrivning ok).
+# Patch: Hero-bakgrund (Alternativ A)
 
-## Install
-- Kopiera filerna rakt in i repo-roten (de hamnar på exakt rätt platser).
-- Deploya → hård-refresh i browsern.
+Den här patchen lägger till en hero-bakgrundsbild och ett JSX-block att klistra in.
+Bild-filen i patchen är en sober gradient-placeholder. Byt gärna ut den mot din ölglas-bild
+med **samma filnamn** (`beer-glasses-hero.jpg`) för att få fotot utan kodändringar.
 
-/[lang]–sidorna rörs inte. Hero visas endast på startsidan.
+## Innehåll
+- `public/images/beer-glasses-hero.jpg` – placeholder (kan ersättas av din ölglas-bild)
+- `snippet-hero-artwork.tsx` – färdigt JSX-block att klistra in i `app/[lang]/page.tsx` (och ev. `app/page.tsx`)
+
+## Steg
+1. Lägg till/ersätt filen på `public/images/beer-glasses-hero.jpg`.
+2. Öppna din sida och ersätt den svarta rutan under rubriken med innehållet i `snippet-hero-artwork.tsx`.
+3. Deploya.
+
+Blocket har overlay + höjd som ser bra ut på både mobil och desktop.
